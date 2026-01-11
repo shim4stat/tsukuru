@@ -4,7 +4,7 @@ namespace Game.Domain
 {
     public class BattleContext
     {
-        public BattlePhase Phase { get; private set; }
+        public BattlePhase Phase { get; private set; } = BattlePhase.BattleStart;
         public Player Player { get; private set; }
         public Robot Robot { get; private set; }
         public Boss Boss { get; private set; }
