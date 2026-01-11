@@ -8,10 +8,10 @@ namespace Game.Domain
         public Player Player { get; private set; }
         public Robot Robot { get; private set; }
         public Boss Boss { get; private set; }
-        public List<Enemy> Enemies { get; private set; }
-        public List<RobotBullet> RobotBullets { get; private set; }
-        public List<EnemyBullet> EnemyBullets { get; private set; }
-        public List<ItemInstance> Items { get; private set; }
+        public List<Enemy> Enemies { get; private set; } = new List<Enemy>();
+        public List<RobotBullet> RobotBullets { get; private set; } = new List<RobotBullet>();
+        public List<EnemyBullet> EnemyBullets { get; private set; } = new List<EnemyBullet>();
+        public List<ItemInstance> Items { get; private set; } = new List<ItemInstance>();
 
         public void SetPhase(BattlePhase phase)
         {
