@@ -34,12 +34,12 @@ namespace Game.Domain
         {
             // Requirement: Reset internal state and restart from BossBoot
             Phase = BattlePhase.BossBoot;
-            
+
             Enemies.Clear();
             RobotBullets.Clear();
             EnemyBullets.Clear();
             Items.Clear();
-            
+
             // TODO: Reset Player and Boss state
         }
     }
