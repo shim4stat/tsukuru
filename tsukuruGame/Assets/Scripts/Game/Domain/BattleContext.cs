@@ -18,11 +18,6 @@ namespace Game.Domain
             Phase = phase;
         }
 
-        public BattlePhase GetPhase()
-        {
-            return Phase;
-        }
-
         public void Setup(StageId stageId, IBattleEntityFactory factory)
         {
             Phase = BattlePhase.BattleStart;
