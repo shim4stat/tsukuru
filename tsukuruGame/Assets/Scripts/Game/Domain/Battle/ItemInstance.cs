@@ -1,4 +1,4 @@
-namespace Game.Domain
+namespace Game.Domain.Battle
 {
     public class ItemInstance
     {
