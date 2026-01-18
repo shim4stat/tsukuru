@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Game.Domain
+namespace Game.Domain.Battle
 {
     public class BattleContext
     {
