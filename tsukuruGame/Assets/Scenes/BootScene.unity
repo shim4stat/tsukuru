@@ -301,11 +301,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BootEntryPoint
   stageDefinitions:
-  - {fileID: 0}
-  playerParams: {fileID: 0}
-  bossParams: []
-  attackSequences: []
-  storySequences: []
+  - {fileID: 11400000, guid: 08f3ce48ee0810d47979b8e6607aafa2, type: 2}
+  playerParams: {fileID: 11400000, guid: e3dc38db8da6004469447bf6e025f062, type: 2}
+  bossParams:
+  - {fileID: 11400000, guid: d447cabedc17e7c4c881bb4c14c67188, type: 2}
+  attackSequences:
+  - {fileID: 11400000, guid: 2624b679b06cb7048804ef777f88796a, type: 2}
+  storySequences:
+  - {fileID: 11400000, guid: e19c59fa25469f24c995bf352827ae53, type: 2}
   titleSceneName: TitleScene
   gameSceneName: GameScene
 --- !u!1660057539 &9223372036854775807
