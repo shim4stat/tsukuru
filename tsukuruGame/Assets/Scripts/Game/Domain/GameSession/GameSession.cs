@@ -1,6 +1,7 @@
 ﻿// Auto-generated for Step2: GameSession (minimal) - Domain (UnityEngine dependency-free)
 
 using System;
+using Game.Domain.Battle;
 
 namespace Game.Domain.GameSession
 {
