@@ -35,8 +35,10 @@ namespace Game.Presentation.Boot
         {
             try
             {
+                // Fail fast: 起動時に必須参照が欠けている場合はここで止める。
                 ValidateSerializedFields();
 
+                // Composition Root: 各層の実装を束ねて依存関係を構成する。
                 ISaveRepository saveRepository = new JsonSaveRepository();
                 ISettingsApplier settingsApplier = new UnitySettingsApplier();
                 IMasterDataRepository masterDataRepository = new ScriptableObjectMasterDataRepository(
@@ -47,13 +49,16 @@ namespace Game.Presentation.Boot
                     storySequences);
                 ISceneLoader sceneLoader = new UnitySceneLoader(titleSceneName, gameSceneName);
 
+                // 保存済み設定を読み込み、タイトル表示前に反映する。
                 SaveDataContract saveData = saveRepository.LoadOrCreateDefault();
                 settingsApplier.ApplySettings(saveData.Settings);
 
+                // 実行時セッションを生成し、シーン跨ぎで参照できるよう保持する。
                 GameSession gameSession = new GameSession();
                 GameSessionHolder holder = ResolveOrCreateHolder();
                 holder.Initialize(gameSession);
 
+                // TitleScene から利用するサービス群を登録する。
                 GameFlowUseCase flowUseCase = new GameFlowUseCase(gameSession, masterDataRepository, sceneLoader);
                 OptionUseCase optionUseCase = new OptionUseCase(saveRepository, settingsApplier);
                 GameServicesLocator.Set(new GameServices(
@@ -64,6 +69,7 @@ namespace Game.Presentation.Boot
                     settingsApplier,
                     masterDataRepository));
 
+                // Boot完了後は常にTitleからゲームフローを開始する。
                 flowUseCase.StartFromTitle();
             }
             catch (Exception ex)
@@ -78,6 +84,7 @@ namespace Game.Presentation.Boot
             if (GameSessionHolder.Instance != null)
                 return GameSessionHolder.Instance;
 
+            // BootScene内にHolderが無い場合はランタイム生成する。
             GameObject holderObject = new GameObject("GameSessionHolder");
             return holderObject.AddComponent<GameSessionHolder>();
         }
