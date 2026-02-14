@@ -45,6 +45,7 @@ namespace Game.Presentation.Title
                 return;
 
             _optionUseCase.CloseAndSave();
+            _view.Hide();
             _flowUseCase.CloseOption();
             _isOpen = false;
         }
