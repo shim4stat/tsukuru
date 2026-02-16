@@ -13,6 +13,12 @@ namespace Game.Presentation.Common
             _services = services ?? throw new ArgumentNullException(nameof(services));
         }
 
+        public static bool TryGet(out GameServices services)
+        {
+            services = _services;
+            return services != null;
+        }
+
         public static GameServices Require()
         {
             if (_services == null)

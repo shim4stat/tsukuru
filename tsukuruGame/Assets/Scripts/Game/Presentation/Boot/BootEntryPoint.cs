@@ -38,45 +38,112 @@ namespace Game.Presentation.Boot
                 // Fail fast: 起動時に必須参照が欠けている場合はここで止める。
                 ValidateSerializedFields();
 
-                // Composition Root: 各層の実装を束ねて依存関係を構成する。
                 ISaveRepository saveRepository = new JsonSaveRepository();
                 ISettingsApplier settingsApplier = new UnitySettingsApplier();
-                IMasterDataRepository masterDataRepository = new ScriptableObjectMasterDataRepository(
-                    stageDefinitions,
-                    playerParams,
-                    bossParams,
-                    attackSequences,
-                    storySequences);
-                ISceneLoader sceneLoader = new UnitySceneLoader(titleSceneName, gameSceneName);
 
                 // 保存済み設定を読み込み、タイトル表示前に反映する。
                 SaveDataContract saveData = saveRepository.LoadOrCreateDefault();
                 settingsApplier.ApplySettings(saveData.Settings);
 
-                // 実行時セッションを生成し、シーン跨ぎで参照できるよう保持する。
-                GameSession gameSession = new GameSession();
                 GameSessionHolder holder = ResolveOrCreateHolder();
-                holder.Initialize(gameSession);
-
-                // TitleScene から利用するサービス群を登録する。
-                GameFlowUseCase flowUseCase = new GameFlowUseCase(gameSession, masterDataRepository, sceneLoader);
-                OptionUseCase optionUseCase = new OptionUseCase(saveRepository, settingsApplier);
-                GameServicesLocator.Set(new GameServices(
-                    flowUseCase,
-                    optionUseCase,
-                    gameSession,
-                    saveRepository,
-                    settingsApplier,
-                    masterDataRepository));
+                GameServices services = ResolveOrRepairServices(holder, saveRepository, settingsApplier);
 
                 // Boot完了後は常にTitleからゲームフローを開始する。
-                flowUseCase.StartFromTitle();
+                services.GameFlowUseCase.StartFromTitle();
             }
             catch (Exception ex)
             {
                 Debug.LogException(ex, this);
+#if UNITY_EDITOR
                 throw;
+#else
+                enabled = false;
+                Debug.LogError("Boot initialization failed in player build. component disabled.", this);
+#endif
             }
+        }
+
+        private GameServices ResolveOrRepairServices(
+            GameSessionHolder holder,
+            ISaveRepository saveRepository,
+            ISettingsApplier settingsApplier)
+        {
+            if (holder == null)
+                throw new ArgumentNullException(nameof(holder));
+            if (saveRepository == null)
+                throw new ArgumentNullException(nameof(saveRepository));
+            if (settingsApplier == null)
+                throw new ArgumentNullException(nameof(settingsApplier));
+
+            bool hasSession = holder.HasSession;
+            bool hasServices = GameServicesLocator.TryGet(out GameServices existingServices);
+
+            if (hasSession && hasServices && ReferenceEquals(existingServices.GameSession, holder.Session))
+                return existingServices;
+
+            if (hasSession && hasServices)
+            {
+                Debug.LogWarning("Boot detected inconsistent runtime state. Rebuilding services with existing holder session.");
+                return RebuildServices(holder.Session, saveRepository, settingsApplier);
+            }
+
+            if (hasSession)
+                return RebuildServices(holder.Session, saveRepository, settingsApplier);
+
+            if (hasServices)
+            {
+                Debug.LogWarning("Boot detected services without holder session. Recreating session and rebuilding services.");
+                return RebuildServices(CreateAndAssignSession(holder), saveRepository, settingsApplier);
+            }
+
+            return RebuildServices(CreateAndAssignSession(holder), saveRepository, settingsApplier);
+        }
+
+        private GameSession CreateAndAssignSession(GameSessionHolder holder)
+        {
+            if (holder == null)
+                throw new ArgumentNullException(nameof(holder));
+
+            if (holder.HasSession)
+                return holder.Session;
+
+            GameSession session = new GameSession();
+            holder.Initialize(session);
+            return session;
+        }
+
+        private GameServices RebuildServices(
+            GameSession gameSession,
+            ISaveRepository saveRepository,
+            ISettingsApplier settingsApplier)
+        {
+            if (gameSession == null)
+                throw new ArgumentNullException(nameof(gameSession));
+            if (saveRepository == null)
+                throw new ArgumentNullException(nameof(saveRepository));
+            if (settingsApplier == null)
+                throw new ArgumentNullException(nameof(settingsApplier));
+
+            IMasterDataRepository masterDataRepository = new ScriptableObjectMasterDataRepository(
+                stageDefinitions,
+                playerParams,
+                bossParams,
+                attackSequences,
+                storySequences);
+            ISceneLoader sceneLoader = new UnitySceneLoader(titleSceneName, gameSceneName);
+
+            GameFlowUseCase flowUseCase = new GameFlowUseCase(gameSession, masterDataRepository, sceneLoader);
+            OptionUseCase optionUseCase = new OptionUseCase(saveRepository, settingsApplier);
+            GameServices services = new GameServices(
+                flowUseCase,
+                optionUseCase,
+                gameSession,
+                saveRepository,
+                settingsApplier,
+                masterDataRepository);
+
+            GameServicesLocator.Set(services);
+            return services;
         }
 
         private GameSessionHolder ResolveOrCreateHolder()
