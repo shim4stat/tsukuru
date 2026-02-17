@@ -27,6 +27,7 @@ namespace Game.Presentation.Title
             new ResolutionOption(1920, 1080),
         };
 
+        // UIへ値を反映する途中で設定変更イベントが発火しないようにするフラグ。
         private bool _suppressEvents;
 
         public event Action<GameSettingsContract> SettingsChanged;
@@ -37,6 +38,7 @@ namespace Game.Presentation.Title
         public void Bind()
         {
             ValidateBindings();
+            // 解像度候補はInspectorではなくコード側で固定管理する。
             SetupResolutionDropdownIfNeeded();
 
             bgmSlider.onValueChanged.AddListener(OnAnySettingsChanged);
@@ -79,11 +81,13 @@ namespace Game.Presentation.Title
         public void SetSettings(GameSettingsContract settings)
         {
             ValidateBindings();
+            // nullや範囲外の値を許容し、表示用に安全な値へ補正する。
             GameSettingsContract normalized = Normalize(settings);
 
             _suppressEvents = true;
             try
             {
+                // 値反映中は通知なしAPIを使い、循環的な更新を防ぐ。
                 bgmSlider.SetValueWithoutNotify(normalized.Volume.BgmVolume);
                 bgmToggle.SetIsOnWithoutNotify(normalized.Volume.BgmEnabled);
                 seSlider.SetValueWithoutNotify(normalized.Volume.SeVolume);
@@ -172,6 +176,7 @@ namespace Game.Presentation.Title
 
         private int FindResolutionIndex(int width, int height)
         {
+            // 完全一致を優先し、見つからない場合はFull HDを既定値として使う。
             for (int i = 0; i < _resolutionOptions.Length; i++)
             {
                 if (_resolutionOptions[i].Width == width && _resolutionOptions[i].Height == height)

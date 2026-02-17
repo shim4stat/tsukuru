@@ -20,6 +20,7 @@ namespace Game.Presentation.Title
 
         public void Bind()
         {
+            // 起動時に参照不備を早期検出して、UIイベント登録を安全に行う。
             ValidateBindings();
 
             startButton.onClick.AddListener(OnStartClicked);
@@ -45,6 +46,7 @@ namespace Game.Presentation.Title
 
         public void FocusInitial()
         {
+            // 明示指定がなければ「はじめる」ボタンにフォーカスを合わせる。
             Selectable focus = initialFocus != null ? initialFocus : startButton;
             if (focus == null || EventSystem.current == null)
                 return;

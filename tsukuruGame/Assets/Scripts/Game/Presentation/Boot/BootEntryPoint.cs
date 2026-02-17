@@ -18,8 +18,13 @@ using UnityEngine;
 
 namespace Game.Presentation.Boot
 {
+    /// <summary>
+    /// BootSceneの起動エントリーポイント。
+    /// 必須アセット検証、サービス再構築、初期画面遷移を担当する。
+    /// </summary>
     public sealed class BootEntryPoint : MonoBehaviour
     {
+        // マスターデータ群（ScriptableObject参照）
         [Header("MasterData")]
         [SerializeField] private List<StageDefinitionAsset> stageDefinitions = new List<StageDefinitionAsset>();
         [SerializeField] private PlayerParamsAsset playerParams;
@@ -27,10 +32,14 @@ namespace Game.Presentation.Boot
         [SerializeField] private List<AttackSequenceAsset> attackSequences = new List<AttackSequenceAsset>();
         [SerializeField] private List<StorySequenceAsset> storySequences = new List<StorySequenceAsset>();
 
+        // フロー用シーン名
         [Header("Scene Names")]
         [SerializeField] private string titleSceneName = "TitleScene";
         [SerializeField] private string gameSceneName = "GameScene";
 
+        /// <summary>
+        /// 起動時初期化。設定適用、サービス解決、タイトル開始を行う。
+        /// </summary>
         private void Start()
         {
             try
@@ -63,6 +72,9 @@ namespace Game.Presentation.Boot
             }
         }
 
+        /// <summary>
+        /// 既存のHolder/Services状態を検査し、整合していれば再利用、不整合なら再構築する。
+        /// </summary>
         private GameServices ResolveOrRepairServices(
             GameSessionHolder holder,
             ISaveRepository saveRepository,
@@ -99,6 +111,9 @@ namespace Game.Presentation.Boot
             return RebuildServices(CreateAndAssignSession(holder), saveRepository, settingsApplier);
         }
 
+        /// <summary>
+        /// HolderにGameSessionが無ければ新規作成して割り当てる。
+        /// </summary>
         private GameSession CreateAndAssignSession(GameSessionHolder holder)
         {
             if (holder == null)
@@ -112,6 +127,9 @@ namespace Game.Presentation.Boot
             return session;
         }
 
+        /// <summary>
+        /// アプリ実行に必要なサービス一式を構築し、Locatorへ登録する。
+        /// </summary>
         private GameServices RebuildServices(
             GameSession gameSession,
             ISaveRepository saveRepository,
@@ -146,6 +164,9 @@ namespace Game.Presentation.Boot
             return services;
         }
 
+        /// <summary>
+        /// 既存のGameSessionHolderを取得し、無ければランタイム生成する。
+        /// </summary>
         private GameSessionHolder ResolveOrCreateHolder()
         {
             if (GameSessionHolder.Instance != null)
@@ -156,6 +177,9 @@ namespace Game.Presentation.Boot
             return holderObject.AddComponent<GameSessionHolder>();
         }
 
+        /// <summary>
+        /// Inspector設定の必須参照とシーン名を検証する。
+        /// </summary>
         private void ValidateSerializedFields()
         {
             ValidateAssetList(stageDefinitions, nameof(stageDefinitions));
@@ -171,12 +195,18 @@ namespace Game.Presentation.Boot
                 throw new InvalidOperationException("gameSceneName is null or empty.");
         }
 
+        /// <summary>
+        /// 単体アセット参照のnullを検証する。
+        /// </summary>
         private static void ValidateAsset(UnityEngine.Object asset, string name)
         {
             if (asset == null)
                 throw new InvalidOperationException($"BootEntryPoint required asset is null: {name}");
         }
 
+        /// <summary>
+        /// アセットリストのnull/空/要素nullを検証する。
+        /// </summary>
         private static void ValidateAssetList<T>(IReadOnlyList<T> assets, string name) where T : UnityEngine.Object
         {
             if (assets == null)

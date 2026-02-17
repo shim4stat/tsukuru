@@ -49,6 +49,7 @@ namespace Game.Presentation.Title
         public void Rebuild(IReadOnlyList<StageSelectItemViewModel> items)
         {
             ValidateBindings();
+            // 以前の生成物を破棄してから再構築し、重複表示を防ぐ。
             ClearItems();
 
             if (items == null)
@@ -65,12 +66,14 @@ namespace Game.Presentation.Title
                 string stageId = item.StageId;
                 string displayName = item.DisplayName;
                 string bestRank = item.BestRank;
+                // クリック時に選択表示も同期させるため、必要情報を束縛して渡す。
                 button.onClick.AddListener(() => OnStageClicked(stageId, displayName, bestRank));
                 _spawnedButtons.Add(button);
             }
 
             if (items.Count > 0)
             {
+                // 初期表示は先頭ステージの情報を表示する。
                 SetSelectedStageDetails(items[0].DisplayName, items[0].BestRank);
             }
             else
@@ -104,6 +107,7 @@ namespace Game.Presentation.Title
 
         private Selectable ResolveInitialFocus()
         {
+            // 優先順位: 明示指定 -> 解放済みステージ -> 閉じるボタン。
             if (initialFocus != null && initialFocus.IsInteractable())
                 return initialFocus;
 
@@ -126,6 +130,7 @@ namespace Game.Presentation.Title
                 stageNameLabel.text = displayName ?? string.Empty;
 
             if (rankLabel != null)
+                // ランク未設定時はプレースホルダを表示する。
                 rankLabel.text = string.IsNullOrWhiteSpace(bestRank) ? "-" : bestRank;
         }
 

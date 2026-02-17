@@ -1,9 +1,9 @@
-﻿// Auto-generated for Step1: Domain enums (UnityEngine dependency-free)
+﻿// Step1向けに自動生成: Domain列挙体（UnityEngine依存なし）
 
 namespace Game.Domain.GameSession
 {
     /// <summary>
-    /// High-level mode of the application (Title / StageSelect / Option / InGame).
+    /// アプリケーション全体の上位モード（Title / StageSelect / Option / InGame）。
     /// </summary>
     public enum GameMode
     {

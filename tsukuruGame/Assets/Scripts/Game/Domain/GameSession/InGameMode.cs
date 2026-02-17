@@ -1,9 +1,9 @@
-﻿// Auto-generated for Step1: Domain enums (UnityEngine dependency-free)
+﻿// Step1向けに自動生成: Domain列挙体（UnityEngine依存なし）
 
 namespace Game.Domain.GameSession
 {
     /// <summary>
-    /// Sub-mode while <see cref="GameMode.InGame"/>.
+    /// <see cref="GameMode.InGame"/> 中のサブモード。
     /// </summary>
     public enum InGameMode
     {
