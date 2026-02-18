@@ -1,5 +1,4 @@
-﻿using Codice.Client.BaseCommands;
-using Game.Domain.Battle;
+﻿using Game.Domain.Battle;
 using UnityEngine;
 
 namespace Game.Presentation
