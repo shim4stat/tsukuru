@@ -5,7 +5,9 @@
         "GUID:5edd96e8c41f9dd43a9ddaf54a633d43",
         "GUID:af590be25acbc2e43a3793feef953dda",
         "GUID:2155a4ec8a3f89746a4787b823525825",
-        "GUID:53cf1113261089f47b36a3847ef5362b"
+        "GUID:53cf1113261089f47b36a3847ef5362b",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
