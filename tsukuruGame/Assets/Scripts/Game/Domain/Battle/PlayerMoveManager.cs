@@ -313,7 +313,7 @@ namespace Game.Domain.Battle
         }
 
         /// <summary>
-        /// StageMapの静的配列を参照して「壁判定」を行う
+        /// StageMapのインスタンスを参照して「壁判定」を行う
         /// </summary>
         private bool CanMove((int x, int y) currentPos, (int x, int y) dir)
         {
@@ -324,9 +324,9 @@ namespace Game.Domain.Battle
             if (dir == (1, 0))
             {
                 // マップ端チェック
-                if (x >= StageMap.Width - 1) return false;
+                if (x >= stagemap.Width - 1) return false;
                 // 壁チェック: VerticalWalls[x, y] が true なら壁あり
-                return !StageMap.VerticalWalls[x, y];
+                return !stagemap.VerticalWalls[x, y];
             }
 
             // --- 左移動 (-1, 0) ---
@@ -334,14 +334,14 @@ namespace Game.Domain.Battle
             {
                 if (x <= 0) return false;
                 // 左に行くときは、自分の「左隣の壁」＝ (x-1, y) のVerticalWallを見る
-                return !StageMap.VerticalWalls[x - 1, y];
+                return !stagemap.VerticalWalls[x - 1, y];
             }
 
             // 下移動 (0, 1)
             if (dir == (0, 1))
             {
-                if (y >= StageMap.Height - 1) return false;
-                return !StageMap.HorizontalWalls[x, y];
+                if (y >= stagemap.Height - 1) return false;
+                return !stagemap.HorizontalWalls[x, y];
             }
 
             // 上移動 (0, -1)
@@ -349,7 +349,7 @@ namespace Game.Domain.Battle
             {
                 if (y <= 0) return false;
                 // 上に行くときは、自分の「上の壁」＝ (x, y-1) のHorizontalWallを見る
-                return !StageMap.HorizontalWalls[x, y - 1];
+                return !stagemap.HorizontalWalls[x, y - 1];
             }
 
             return false;

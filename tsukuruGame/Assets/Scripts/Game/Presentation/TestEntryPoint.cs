@@ -16,7 +16,9 @@ namespace Game.Presentation
             var battleContext = new Domain.Battle.BattleContext();
 
             string stageJsonPath = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle/stage.json");
-            var stageMap = Domain.Battle.StageMap.LoadFromFile(stageJsonPath);
+            var repository = new Game.Infrastructure.Battle.StageMapRepository();
+            var stageMapDto = repository.LoadStageMap(stageJsonPath);
+            var stageMap = Domain.Battle.StageMap.CreateFromDto(stageMapDto);
 
             // SetupでPlayerを生成してからManagerに渡す
             battleContext.Setup(new StageId(1), new BattleEntityFactory());

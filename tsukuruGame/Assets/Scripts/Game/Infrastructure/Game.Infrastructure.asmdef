@@ -2,8 +2,8 @@
     "name": "Game.Infrastructure",
     "rootNamespace": "Game.Infrastructure",
     "references": [
-        "GUID:53cf1113261089f47b36a3847ef5362b",
-        "GUID:2155a4ec8a3f89746a4787b823525825"
+        "Game.Domain",
+        "Game.Contracts"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
