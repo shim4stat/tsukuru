@@ -21,7 +21,7 @@ namespace Game.Presentation
             if (Input.GetKey(KeyCode.A)) inputDir += UnityEngine.Vector2Int.left;
             if (Input.GetKey(KeyCode.D)) inputDir += UnityEngine.Vector2Int.right;
 
-            Debug.Log($"Input Direction: {inputDir}");
+            // Debug.Log($"Input Direction: {inputDir}");
 
             playerMoveManager.SetInputDirection((inputDir.x, inputDir.y));
 
