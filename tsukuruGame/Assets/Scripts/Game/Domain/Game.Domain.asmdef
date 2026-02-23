@@ -2,7 +2,7 @@
     "name": "Game.Domain",
     "rootNamespace": "Game.Domain",
     "references": [
-        "GUID:53cf1113261089f47b36a3847ef5362b"
+        "Game.Contracts"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
