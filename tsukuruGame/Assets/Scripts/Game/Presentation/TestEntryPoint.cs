@@ -14,7 +14,9 @@ namespace Game.Presentation
         {
             // 仮の初期化コード。実際はBattleContextやStageMapを作成して渡す必要がある。
             var battleContext = new Domain.Battle.BattleContext();
-            var stageMap = new Domain.Battle.StageMap();
+
+            string stageJsonPath = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle/stage.json");
+            var stageMap = Domain.Battle.StageMap.LoadFromFile(stageJsonPath);
 
             // SetupでPlayerを生成してからManagerに渡す
             battleContext.Setup(new StageId(1), new BattleEntityFactory());
