@@ -12,6 +12,7 @@ namespace Game.Presentation.Game
     /// </summary>
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
+        [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
 
         private enum FlowState
@@ -27,8 +28,10 @@ namespace Game.Presentation.Game
         private GameServices _services;
         private GameSession _session;
         private StageDefinitionContract _stage;
+        private PlayerParamsContract _playerParams;
         private BattleContext _battleContext;
         private BattleFlowService _battleFlowService;
+        private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private FlowState _flowState = FlowState.Initializing;
         private bool _isInitialized;
@@ -77,6 +80,18 @@ namespace Game.Presentation.Game
 
         private void OnDestroy()
         {
+            if (_gameHudPresenter != null)
+            {
+                _gameHudPresenter.Hide();
+                _gameHudPresenter.Dispose();
+            }
+
+            if (_gameHudPresenter != null && gameHudView != null)
+            {
+                gameHudView.Hide();
+                gameHudView.Unbind();
+            }
+
             if (_bossTitleOverlayPresenter != null)
             {
                 _bossTitleOverlayPresenter.Finished -= OnBossTitleOverlayFinished;
@@ -92,8 +107,10 @@ namespace Game.Presentation.Game
 
             _battleContext = null;
             _battleFlowService = null;
+            _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
             _stage = null;
+            _playerParams = null;
             _session = null;
             _services = null;
             _isInitialized = false;
@@ -116,6 +133,11 @@ namespace Game.Presentation.Game
             if (_stage == null)
                 throw new InvalidOperationException($"Stage master data is null: {_session.CurrentStageId}");
 
+            _playerParams = _services.MasterDataRepository.GetPlayerParams();
+            if (_playerParams == null)
+                throw new InvalidOperationException("Player master data is null.");
+
+            InitializeGameHud();
             InitializeBossTitleOverlay();
             CreateBattleRuntime();
 
@@ -159,6 +181,8 @@ namespace Game.Presentation.Game
 
         private void HandleStoryBeforeBattle()
         {
+            HideGameHud();
+
             // STORY-01/UI-05 未実装の間は暫定スキップしてBattleへ入る。
             if (_session.InGameMode != InGameMode.Battle)
                 _session.SetInGameMode(InGameMode.Battle);
@@ -172,6 +196,7 @@ namespace Game.Presentation.Game
             if (_battleContext == null || _battleFlowService == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
+            RenderGameHud();
             _battleFlowService.Update(_battleContext, _session, Time.deltaTime);
 
             if (_battleContext.Phase == BattlePhase.BossBoot)
@@ -205,6 +230,8 @@ namespace Game.Presentation.Game
             if (_battleContext == null || _battleFlowService == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
+            HideGameHud();
+
             if (_session.InGameMode != InGameMode.StoryAfterBattle)
                 _session.SetInGameMode(InGameMode.StoryAfterBattle);
 
@@ -223,6 +250,7 @@ namespace Game.Presentation.Game
             if (_isExiting)
                 return;
 
+            HideGameHud();
             _isExiting = true;
             _services.GameFlowUseCase.ReturnToTitleWithStageSelect();
             _flowState = FlowState.Completed;
@@ -251,6 +279,30 @@ namespace Game.Presentation.Game
             _bossTitleOverlayPresenter.Finished += OnBossTitleOverlayFinished;
         }
 
+        private void InitializeGameHud()
+        {
+            if (gameHudView == null)
+                throw new InvalidOperationException("GameSceneEntryPoint.gameHudView is not assigned.");
+
+            gameHudView.Bind();
+            gameHudView.Hide();
+
+            _gameHudPresenter = new GameHudPresenter(gameHudView);
+        }
+
+        private void RenderGameHud()
+        {
+            if (_gameHudPresenter == null)
+                throw new InvalidOperationException("GameHudPresenter is not initialized.");
+
+            _gameHudPresenter.Render(BuildHudModel());
+        }
+
+        private void HideGameHud()
+        {
+            _gameHudPresenter?.Hide();
+        }
+
         private void OnBossTitleOverlayFinished()
         {
             if (_battleContext == null || _battleFlowService == null || _session == null)
@@ -271,6 +323,34 @@ namespace Game.Presentation.Game
                 return _session.CurrentStageId;
 
             return string.Empty;
+        }
+
+        private GameHudViewModel BuildHudModel()
+        {
+            if (_session == null)
+                return GameHudViewModel.Hidden;
+
+            bool visible = _session.IsInGame && _session.InGameMode == InGameMode.Battle;
+            if (!visible)
+                return GameHudViewModel.Hidden;
+
+            int playerHpMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxHp : 1);
+            int playerEnergyMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxEnergy : 1);
+
+            // 暫定値: Domain側のHP/エネルギー実装前は MasterData と固定値でHUDを成立させる。
+            int playerHpCurrent = playerHpMax;
+            int playerEnergyCurrent = 0;
+            bool showBossGauge = _battleContext != null;
+            float bossHpNormalized = 1f;
+
+            return new GameHudViewModel(
+                visible: true,
+                playerHpCurrent: playerHpCurrent,
+                playerHpMax: playerHpMax,
+                playerEnergyCurrent: playerEnergyCurrent,
+                playerEnergyMax: playerEnergyMax,
+                showBossGauge: showBossGauge,
+                bossHpNormalized: bossHpNormalized);
         }
 
         private static StageId ParseBattleStageId(string stageIdText)

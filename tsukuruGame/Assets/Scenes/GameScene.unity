@@ -163,6 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f6be20fa3bc1644ba62fb5e6ed15bc3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Game.Presentation::Game.Presentation.Game.GameSceneEntryPoint
+  bossTitleOverlayView: {fileID: 0}
 --- !u!1 &608692674
 GameObject:
   m_ObjectHideFlags: 0
