@@ -4,6 +4,7 @@ using Game.Domain.Battle;
 using Game.Domain.GameSession;
 using Game.Presentation.Common;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Game.Presentation.Game
 {
@@ -34,6 +35,7 @@ namespace Game.Presentation.Game
         private BossParamsContract _bossParams;
         private BattleContext _battleContext;
         private BattleFlowService _battleFlowService;
+        private BossDamageService _bossDamageService;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private FlowState _flowState = FlowState.Initializing;
@@ -110,6 +112,7 @@ namespace Game.Presentation.Game
 
             _battleContext = null;
             _battleFlowService = null;
+            _bossDamageService = null;
             _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
             _stage = null;
@@ -145,6 +148,7 @@ namespace Game.Presentation.Game
             if (_bossParams == null)
                 throw new InvalidOperationException("Boss master data is null.");
 
+            _bossDamageService = new BossDamageService();
             InitializeGameHud();
             InitializeBossTitleOverlay();
             CreateBattleRuntime();
@@ -215,6 +219,7 @@ namespace Game.Presentation.Game
             }
 
             _bossTitleOverlayPresenter?.ForceHide();
+            HandleDebugBossDamageInput();
 
             if (_battleContext.Phase == BattlePhase.BossDefeated)
             {
@@ -331,6 +336,30 @@ namespace Game.Presentation.Game
         private void HideGameHud()
         {
             _gameHudPresenter?.Hide();
+        }
+
+        private void HandleDebugBossDamageInput()
+        {
+#if UNITY_EDITOR
+            if (!IsDebugBossDamagePressed())
+                return;
+
+            if (_bossDamageService == null)
+                throw new InvalidOperationException("BossDamageService is not initialized.");
+            if (_battleContext == null || _battleFlowService == null || _session == null)
+                throw new InvalidOperationException("Battle runtime is not initialized.");
+
+            _bossDamageService.ApplyBossDamage(_battleContext, _session, _battleFlowService, 1);
+#endif
+        }
+
+        private static bool IsDebugBossDamagePressed()
+        {
+#if UNITY_EDITOR
+            return Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame;
+#else
+            return false;
+#endif
         }
 
         private void OnBossTitleOverlayFinished()
