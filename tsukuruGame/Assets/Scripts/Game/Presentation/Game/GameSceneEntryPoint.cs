@@ -12,6 +12,8 @@ namespace Game.Presentation.Game
     /// </summary>
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
+        [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
+
         private enum FlowState
         {
             Initializing = 0,
@@ -27,6 +29,7 @@ namespace Game.Presentation.Game
         private StageDefinitionContract _stage;
         private BattleContext _battleContext;
         private BattleFlowService _battleFlowService;
+        private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private FlowState _flowState = FlowState.Initializing;
         private bool _isInitialized;
         private bool _isExiting;
@@ -74,8 +77,22 @@ namespace Game.Presentation.Game
 
         private void OnDestroy()
         {
+            if (_bossTitleOverlayPresenter != null)
+            {
+                _bossTitleOverlayPresenter.Finished -= OnBossTitleOverlayFinished;
+                _bossTitleOverlayPresenter.ForceHide();
+                _bossTitleOverlayPresenter.Dispose();
+            }
+
+            if (_bossTitleOverlayPresenter != null && bossTitleOverlayView != null)
+            {
+                bossTitleOverlayView.Hide();
+                bossTitleOverlayView.Unbind();
+            }
+
             _battleContext = null;
             _battleFlowService = null;
+            _bossTitleOverlayPresenter = null;
             _stage = null;
             _session = null;
             _services = null;
@@ -99,6 +116,7 @@ namespace Game.Presentation.Game
             if (_stage == null)
                 throw new InvalidOperationException($"Stage master data is null: {_session.CurrentStageId}");
 
+            InitializeBossTitleOverlay();
             CreateBattleRuntime();
 
             if (_stage.HasIntroStory)
@@ -156,6 +174,14 @@ namespace Game.Presentation.Game
 
             _battleFlowService.Update(_battleContext, _session, Time.deltaTime);
 
+            if (_battleContext.Phase == BattlePhase.BossBoot)
+            {
+                HandleBossBoot();
+                return;
+            }
+
+            _bossTitleOverlayPresenter?.ForceHide();
+
             if (_battleContext.Phase == BattlePhase.BossDefeated)
             {
                 if (_stage != null && _stage.HasOutroStory)
@@ -200,6 +226,51 @@ namespace Game.Presentation.Game
             _isExiting = true;
             _services.GameFlowUseCase.ReturnToTitleWithStageSelect();
             _flowState = FlowState.Completed;
+        }
+
+        private void HandleBossBoot()
+        {
+            if (_bossTitleOverlayPresenter == null)
+                throw new InvalidOperationException("BossTitleOverlayPresenter is not initialized.");
+
+            if (!_bossTitleOverlayPresenter.IsPlaying && (bossTitleOverlayView == null || !bossTitleOverlayView.IsVisible))
+                _bossTitleOverlayPresenter.Open(ResolveBossTitleText());
+
+            _bossTitleOverlayPresenter.Update(Time.deltaTime);
+        }
+
+        private void InitializeBossTitleOverlay()
+        {
+            if (bossTitleOverlayView == null)
+                throw new InvalidOperationException("GameSceneEntryPoint.bossTitleOverlayView is not assigned.");
+
+            bossTitleOverlayView.Bind();
+            bossTitleOverlayView.Hide();
+
+            _bossTitleOverlayPresenter = new BossTitleOverlayPresenter(bossTitleOverlayView);
+            _bossTitleOverlayPresenter.Finished += OnBossTitleOverlayFinished;
+        }
+
+        private void OnBossTitleOverlayFinished()
+        {
+            if (_battleContext == null || _battleFlowService == null || _session == null)
+                throw new InvalidOperationException("Battle runtime is not initialized.");
+
+            if (_battleContext.Phase != BattlePhase.BossBoot)
+                return;
+
+            _battleFlowService.OnBossBootFinished(_battleContext, _session);
+        }
+
+        private string ResolveBossTitleText()
+        {
+            if (_stage != null && !string.IsNullOrWhiteSpace(_stage.DisplayName))
+                return _stage.DisplayName;
+
+            if (_session != null && !string.IsNullOrWhiteSpace(_session.CurrentStageId))
+                return _session.CurrentStageId;
+
+            return string.Empty;
         }
 
         private static StageId ParseBattleStageId(string stageIdText)
