@@ -12,6 +12,8 @@ namespace Game.Presentation.Game
     /// </summary>
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
+        private const string DefaultBossId = "boss_01";
+
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
 
@@ -29,6 +31,7 @@ namespace Game.Presentation.Game
         private GameSession _session;
         private StageDefinitionContract _stage;
         private PlayerParamsContract _playerParams;
+        private BossParamsContract _bossParams;
         private BattleContext _battleContext;
         private BattleFlowService _battleFlowService;
         private GameHudPresenter _gameHudPresenter;
@@ -111,6 +114,7 @@ namespace Game.Presentation.Game
             _bossTitleOverlayPresenter = null;
             _stage = null;
             _playerParams = null;
+            _bossParams = null;
             _session = null;
             _services = null;
             _isInitialized = false;
@@ -136,6 +140,10 @@ namespace Game.Presentation.Game
             _playerParams = _services.MasterDataRepository.GetPlayerParams();
             if (_playerParams == null)
                 throw new InvalidOperationException("Player master data is null.");
+
+            _bossParams = ResolveBossParamsForCurrentStage();
+            if (_bossParams == null)
+                throw new InvalidOperationException("Boss master data is null.");
 
             InitializeGameHud();
             InitializeBossTitleOverlay();
@@ -163,6 +171,7 @@ namespace Game.Presentation.Game
 
             _battleContext = new BattleContext();
             _battleContext.Setup(battleStageId, new BattleEntityFactory());
+            InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
         }
 
@@ -279,6 +288,27 @@ namespace Game.Presentation.Game
             _bossTitleOverlayPresenter.Finished += OnBossTitleOverlayFinished;
         }
 
+        private BossParamsContract ResolveBossParamsForCurrentStage()
+        {
+            if (_services == null)
+                throw new InvalidOperationException("GameServices are not initialized.");
+
+            // 暫定対応: StageDefinition に BossId が無いため、boss_01 固定で解決する。
+            return _services.MasterDataRepository.GetBossParams(DefaultBossId);
+        }
+
+        private void InitializeBossRuntime()
+        {
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_battleContext.Boss == null)
+                throw new InvalidOperationException("BattleContext.Boss is not initialized.");
+            if (_bossParams == null)
+                throw new InvalidOperationException("Boss master data is not initialized.");
+
+            _battleContext.Boss.Initialize(_bossParams);
+        }
+
         private void InitializeGameHud()
         {
             if (gameHudView == null)
@@ -337,11 +367,11 @@ namespace Game.Presentation.Game
             int playerHpMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxHp : 1);
             int playerEnergyMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxEnergy : 1);
 
-            // 暫定値: Domain側のHP/エネルギー実装前は MasterData と固定値でHUDを成立させる。
+            // 暫定値: Domain側の自機HP/エネルギー実装前は MasterData と固定値でHUDを成立させる。
             int playerHpCurrent = playerHpMax;
             int playerEnergyCurrent = 0;
-            bool showBossGauge = _battleContext != null;
-            float bossHpNormalized = 1f;
+            bool showBossGauge = _battleContext != null && _battleContext.Boss != null;
+            float bossHpNormalized = showBossGauge ? _battleContext.Boss.GetCurrentGaugeHpNormalized() : 0f;
 
             return new GameHudViewModel(
                 visible: true,
