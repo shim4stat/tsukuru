@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9f69fb1900cfc5408b06cb675c3ba12, type: 3}
   m_Name: SampleBossParams
   m_EditorClassIdentifier: Game.Infrastructure::Game.Infrastructure.MasterData.Assets.BossParamsAsset
-  id: 100
+  id: boss_01
   gaugeMaxHps: 64000000
   baseDropEnergyAmount: 100
   minDropIntervalSeconds: 100
