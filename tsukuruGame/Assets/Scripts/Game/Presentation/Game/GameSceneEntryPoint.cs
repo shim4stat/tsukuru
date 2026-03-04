@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
@@ -14,6 +14,7 @@ namespace Game.Presentation.Game
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
         private const string DefaultBossId = "boss_01";
+        private const string DefaultClearRank = "C";
 
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
@@ -87,26 +88,22 @@ namespace Game.Presentation.Game
         {
             if (_gameHudPresenter != null)
             {
-                _gameHudPresenter.Hide();
                 _gameHudPresenter.Dispose();
             }
 
             if (_gameHudPresenter != null && gameHudView != null)
             {
-                gameHudView.Hide();
                 gameHudView.Unbind();
             }
 
             if (_bossTitleOverlayPresenter != null)
             {
                 _bossTitleOverlayPresenter.Finished -= OnBossTitleOverlayFinished;
-                _bossTitleOverlayPresenter.ForceHide();
                 _bossTitleOverlayPresenter.Dispose();
             }
 
             if (_bossTitleOverlayPresenter != null && bossTitleOverlayView != null)
             {
-                bossTitleOverlayView.Hide();
                 bossTitleOverlayView.Unbind();
             }
 
@@ -266,6 +263,11 @@ namespace Game.Presentation.Game
 
             HideGameHud();
             _isExiting = true;
+            string clearedStageId = _session != null ? _session.CurrentStageId : string.Empty;
+            if (string.IsNullOrWhiteSpace(clearedStageId))
+                throw new InvalidOperationException("Current stage id is empty at exit.");
+
+            _services.StageClearUseCase.SaveStageClear(clearedStageId, DefaultClearRank);
             _services.GameFlowUseCase.ReturnToTitleWithStageSelect();
             _flowState = FlowState.Completed;
         }
