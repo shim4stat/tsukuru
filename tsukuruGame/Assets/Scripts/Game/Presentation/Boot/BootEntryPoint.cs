@@ -151,9 +151,11 @@ namespace Game.Presentation.Boot
             ISceneLoader sceneLoader = new UnitySceneLoader(titleSceneName, gameSceneName);
 
             GameFlowUseCase flowUseCase = new GameFlowUseCase(gameSession, masterDataRepository, sceneLoader);
+            StageClearUseCase stageClearUseCase = new StageClearUseCase(saveRepository, masterDataRepository);
             OptionUseCase optionUseCase = new OptionUseCase(saveRepository, settingsApplier);
             GameServices services = new GameServices(
                 flowUseCase,
+                stageClearUseCase,
                 optionUseCase,
                 gameSession,
                 saveRepository,

@@ -53,9 +53,11 @@ namespace Game.Presentation.TestScenes
             SettingsApplier = new NoOpSettingsApplier();
 
             GameFlowUseCase flowUseCase = new GameFlowUseCase(session, masterDataRepository, SceneLoader);
+            StageClearUseCase stageClearUseCase = new StageClearUseCase(SaveRepository, masterDataRepository);
             OptionUseCase optionUseCase = new OptionUseCase(SaveRepository, SettingsApplier);
             GameServices services = new GameServices(
                 flowUseCase,
+                stageClearUseCase,
                 optionUseCase,
                 session,
                 SaveRepository,
