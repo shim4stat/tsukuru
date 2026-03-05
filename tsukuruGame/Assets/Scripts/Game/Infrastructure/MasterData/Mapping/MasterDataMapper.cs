@@ -57,6 +57,7 @@ namespace Game.Infrastructure.MasterData.Mapping
                 GaugeMaxHps = gauges,
                 BaseDropEnergyAmount = asset.BaseDropEnergyAmount,
                 MinDropIntervalSeconds = asset.MinDropIntervalSeconds,
+                ActionIntervalSeconds = asset.ActionIntervalSeconds,
             };
         }
 
