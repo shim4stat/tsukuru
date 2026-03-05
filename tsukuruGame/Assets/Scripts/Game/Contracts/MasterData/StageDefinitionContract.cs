@@ -9,6 +9,8 @@
 
         public string DisplayName { get; set; } = string.Empty;
 
+        public string BossId { get; set; } = string.Empty;
+
         public int OrderIndex { get; set; }
 
         public bool HasIntroStory { get; set; }

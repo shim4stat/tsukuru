@@ -13,7 +13,6 @@ namespace Game.Presentation.Game
     /// </summary>
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
-        private const string DefaultBossId = "boss_01";
         private const string DefaultClearRank = "C";
 
         [SerializeField] private GameHudView gameHudView;
@@ -299,9 +298,14 @@ namespace Game.Presentation.Game
         {
             if (_services == null)
                 throw new InvalidOperationException("GameServices are not initialized.");
+            if (_stage == null)
+                throw new InvalidOperationException("Stage master data is not initialized.");
+            if (string.IsNullOrWhiteSpace(_stage.Id))
+                throw new InvalidOperationException("StageDefinition.Id is null or empty.");
+            if (string.IsNullOrWhiteSpace(_stage.BossId))
+                throw new InvalidOperationException($"StageDefinition.BossId is null or empty. stageId={_stage.Id}");
 
-            // 暫定対応: StageDefinition に BossId が無いため、boss_01 固定で解決する。
-            return _services.MasterDataRepository.GetBossParams(DefaultBossId);
+            return _services.MasterDataRepository.GetBossParams(_stage.BossId);
         }
 
         private void InitializeBossRuntime()

@@ -16,6 +16,7 @@ namespace Game.Infrastructure.MasterData.Mapping
             {
                 Id = asset.Id ?? string.Empty,
                 DisplayName = asset.DisplayName ?? string.Empty,
+                BossId = asset.BossId ?? string.Empty,
                 OrderIndex = asset.OrderIndex,
                 HasIntroStory = asset.HasIntroStory,
                 IntroStoryId = asset.IntroStoryId ?? string.Empty,

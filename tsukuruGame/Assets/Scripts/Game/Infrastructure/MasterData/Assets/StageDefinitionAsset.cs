@@ -7,6 +7,7 @@ namespace Game.Infrastructure.MasterData.Assets
     {
         [SerializeField] private string id = string.Empty;
         [SerializeField] private string displayName = string.Empty;
+        [SerializeField] private string bossId = string.Empty;
         [SerializeField] private int orderIndex;
         [SerializeField] private bool hasIntroStory;
         [SerializeField] private string introStoryId = string.Empty;
@@ -15,6 +16,7 @@ namespace Game.Infrastructure.MasterData.Assets
 
         public string Id => id;
         public string DisplayName => displayName;
+        public string BossId => bossId;
         public int OrderIndex => orderIndex;
         public bool HasIntroStory => hasIntroStory;
         public string IntroStoryId => introStoryId;
