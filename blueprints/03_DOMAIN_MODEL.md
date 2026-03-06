@@ -205,6 +205,7 @@
 - `RobotBullet`
     - `lifetimeRemaining`, `isActive`
 - `EnemyBullet`
+    - `position`, `velocity`, `behaviorType`
     - `elapsedTime`, `isVanished`
 - `ItemInstance`
     - `ItemDefinition definition`
@@ -212,7 +213,9 @@
 
 **値オブジェクト（＋MasterData）**
 
-- `RobotBulletStaticParams`, `EnemyBulletStaticParams`（SO）
+- `RobotBulletDefinition`, `EnemyBulletDefinition`（SO）
+- `EnemyBulletBehaviorType`
+- `EnemyBulletSpawnRequest`（`BossActionService` が生成する実行時DTO。位置、速度、寿命、威力、吸収量、挙動種別を含む）
 - `ItemDefinition`（SO：回復薬／無敵／エネルギー／特殊エネルギー。種別ごとの効果量に加えて、同時にフィールド上に存在できる最大個数（例：回復3 / 無敵2 / エネルギー200）などの上限情報も持つ）
 
 **サービス**
@@ -236,11 +239,12 @@
     - `currentHp`
     - `TakeDamage(Damage)` / `IsAlive()`
 - `Boss`
+    - `position`
     - `currentGaugeIndex`
     - `currentHpInGauge`
-    - `TakeDamage(Damage, time)`
+    - `TakeDamage(amount)`
+    - `SetPosition(position)`
     - `IsAllGaugesEmpty()`
-    - `CanDropEnergy(time)`（0.1秒間隔制限）
 
 **値オブジェクト（＋MasterData）**
 
@@ -249,8 +253,11 @@
 
 **サービス**
 
+- `BossActionService`
+    - Combat 中のみ Boss の現在 `Boss phase` に対応する攻撃パターンを進行させ、`EnemyBulletSpawnRequest` を返す。
+    - フェーズ切替時にパターン内部状態を `Reset()` し、同一サービス内で `SingleShot` / `NWayShot` / `BurstShot` を切り替える。
 - `EnemySpawnService`
-    - ボスの攻撃パターンとフェーズに応じて雑魚敵をスポーンさせる責務を持つ。例えば `UpdateBossEnemySpawns(Boss boss, BattleContext ctx, float currentTime)` のようなメソッドで、Boss の現在フェーズと攻撃パターン定義（MasterData）を参照しながら `EnemySpawnRequest` を生成し、`BattleContext` 内の `enemies` コレクションに新たな `Enemy` を追加するきっかけを提供する。
+    - ボスの攻撃パターンと `Boss phase` に応じて雑魚敵をスポーンさせる責務を持つ。例えば `UpdateBossEnemySpawns(Boss boss, BattleContext ctx, float currentTime)` のようなメソッドで、Boss の現在 `Boss phase` と攻撃パターン定義（MasterData）を参照しながら `EnemySpawnRequest` を生成し、`BattleContext` 内の `enemies` コレクションに新たな `Enemy` を追加するきっかけを提供する。
 
 ---
 
@@ -433,14 +440,23 @@ class AttackSequenceService {
 
 ```csharp
 class RobotBullet {
-    void Initialize(RobotBulletStaticParams @static);
+    void Initialize(RobotBulletDefinition definition);
     void Update(float deltaTime);
     bool IsExpired();
     bool ShouldDestroyOnHit();
 }
 
+class EnemyBulletSpawnRequest {
+    Vector3 position;
+    Vector3 velocity;
+    EnemyBulletBehaviorType behaviorType;
+    float lifetimeSeconds;
+    int damage;
+    int absorbableEnergyAmount;
+}
+
 class EnemyBullet {
-    void Initialize(EnemyBulletStaticParams @static);
+    void Initialize(EnemyBulletSpawnRequest spawnRequest);
     void Update(float deltaTime);
     bool IsExpired();
     bool IsVanished();
@@ -471,7 +487,7 @@ class ItemSpawnService {
 class EnemySpawnService {
     ///<summary>
     /// ボスの攻撃パターンに応じて雑魚敵スポーン要求を生成する。
-    /// Boss の現在フェーズや攻撃シーケンス定義（MasterData）を参照する。
+    /// Boss の現在 Boss phase や攻撃シーケンス定義（MasterData）を参照する。
     ///</summary>
     IEnumerable<EnemySpawnRequest> UpdateBossEnemySpawns(Boss boss, BattleContext ctx, float currentTime);
 }
@@ -481,17 +497,22 @@ class Enemy {
     bool IsAlive();
 }
 
+class BossActionService {
+    IReadOnlyList<EnemyBulletSpawnRequest> Update(BattleContext context, float deltaTime);
+    void Reset();
+}
+
 class Boss {
-    void TakeDamage(Damage damage, float currentTime);
+    void SetPosition(Vector3 position);
+    void TakeDamage(int amount);
     bool IsAlive();
     bool IsCurrentGaugeEmpty();
     bool IsAllGaugesEmpty();
-    int GetCurrentPhaseIndex();
-
-    bool CanDropEnergy(float currentTime);
-    int GetDropEnergyAmount(int baseDrop, float multiplier);
+    int GetCurrentGaugeIndex();
 }
 ```
+
+※ 現行実装では `EnemyBullet` は `EnemyBulletSpawnRequest` で初期化される。`EnemyBulletDefinition` は共通弾種を再利用したくなった際の拡張枠として残している。
 
 ---
 
@@ -692,7 +713,7 @@ InGame への出入りに合わせて、`BattleContext` や `StoryPlayer` の生
 - Enemy
     - `Alive` → `Dying`（任意）→ `Dead`
 - Boss
-    - 複数ゲージとフェーズを持つ `Alive` → 全ゲージ0で `Defeated`
+    - 複数ゲージと `Boss phase` を持つ `Alive` → 全ゲージ0で `Defeated`
 
 ### 6.6 UI の状態
 
@@ -803,6 +824,11 @@ classDiagram
     EnemyBullet --> EnemyBulletDefinition
     ItemInstance --> ItemDefinition
 ```
+
+補足：
+
+* `BattlePhase` と `Boss phase` は別概念である。前者はバトル進行、後者は Boss のゲージ連動攻撃フェーズを指す。
+* 現行実装では `EnemyBullet` の生成は `EnemyBulletSpawnRequest` を介して行い、`EnemyBulletDefinition` への直接参照は将来の共通弾種化のための拡張枠として扱う。
 
 ### 7.3 紙芝居
 

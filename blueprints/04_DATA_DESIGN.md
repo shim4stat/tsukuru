@@ -156,13 +156,29 @@
 * `List<int> gaugeMaxHps`（複数ゲージ最大HP）
 * `int baseDropEnergyAmount`
 * `float minDropIntervalSeconds`（要件：0.1秒に1回まで）
-* （任意）`List<BossPhaseDefinition> phases`（攻撃パターン参照。詳細未確定のため拡張枠として確保）
+* `float actionIntervalSeconds`（互換用。`phases` 未設定時のフォールバック生成にのみ使用）
+* `List<BossPhaseDefinition> phases`（各ゲージに対応する攻撃パターン定義。`gaugeMaxHps` と同数）
 
-`BossPhaseDefinition`（拡張枠）
+`BossPhaseDefinition`
 
-* `string phaseId`
-* `string enemySpawnPatternId`（雑魚召喚パターン）
-* `string bulletPatternId`（弾幕パターン）
+* `BossAttackPatternType patternType`（`SingleShot` / `NWayShot` / `BurstShot`）
+* `float fireIntervalSeconds`
+* `int shotCount`（`NWayShot` 用）
+* `float spreadDegrees`（`NWayShot` 用）
+* `int burstShotCount`（`BurstShot` 用）
+* `float burstShotIntervalSeconds`（`BurstShot` 用）
+* `float bulletSpeed`
+* `float bulletLifetimeSeconds`
+* `int bulletDamage`
+* `int absorbableEnergyAmount`
+* `EnemyBulletBehaviorType bulletBehaviorType`（現行実運用は `Straight` のみ）
+* `Vector3 spawnOffset`（Boss位置からの発射原点オフセット）
+* `Vector3 fireDirection`（正規化して使用）
+
+補足：
+
+* 現行実装では `BossActionService` が `BossPhaseDefinition` を参照して `EnemyBulletSpawnRequest` を組み立てる。
+* `phases` が空の場合は `actionIntervalSeconds` を用いた `SingleShot` / `NWayShot` / `BurstShot` のフォールバック生成で互換動作させる。
 
 ### 4.5 AttackSequenceDefinition（攻撃/特殊攻撃シーケンス）
 
@@ -178,7 +194,7 @@
 * `string robotBulletId`（生成するBullet種別）
 * `float dropMultiplier`（要件：攻撃によってドロップ倍率変動）
 
-### 4.6 RobotBulletDefinition / EnemyBulletDefinition（弾定義）
+### 4.6 RobotBulletDefinition / EnemyBulletDefinition（弾定義 / 共通弾種）
 
 `RobotBulletDefinition`
 
@@ -196,6 +212,11 @@
 * `float lifetimeSeconds`
 * `int absorbableEnergyAmount`（ダッシュ吸収で得られる）
 * （表示側のみ）`GameObject prefab`
+
+補足：
+
+* 現行のボス弾幕は `BossPhaseDefinition` が弾速・発射方向・挙動種別などの発射設定を直接持つ。
+* `EnemyBulletDefinition` は共通弾種を再利用したくなった段階で参照元へ昇格させる拡張枠とする。
 
 ### 4.7 ItemDefinition（アイテム定義）
 
