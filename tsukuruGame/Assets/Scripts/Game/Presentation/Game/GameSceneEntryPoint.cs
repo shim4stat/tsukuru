@@ -15,9 +15,6 @@ namespace Game.Presentation.Game
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
         private const string DefaultClearRank = "C";
-        private const int DefaultEnemyBulletDamage = 1;
-        private const float DefaultEnemyBulletLifetimeSeconds = 2.0f;
-        private const int DefaultEnemyBulletAbsorbableEnergyAmount = 1;
 
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
@@ -385,12 +382,8 @@ namespace Game.Presentation.Game
             if (_enemyBulletService == null)
                 throw new InvalidOperationException("EnemyBulletService is not initialized.");
 
-            IReadOnlyList<BossActionSpawnRequest> requests = _bossActionService.Update(_battleContext, deltaTime);
-            for (int i = 0; i < requests.Count; i++)
-            {
-                EnemyBulletSpawnParams spawnParams = BuildEnemyBulletSpawnParams(requests[i]);
-                _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, spawnParams);
-            }
+            IReadOnlyList<EnemyBulletSpawnRequest> requests = _bossActionService.Update(_battleContext, deltaTime);
+            _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, requests);
         }
 
         private void HandleDebugBossDamageInput()
@@ -415,15 +408,6 @@ namespace Game.Presentation.Game
 #else
             return false;
 #endif
-        }
-
-        private static EnemyBulletSpawnParams BuildEnemyBulletSpawnParams(BossActionSpawnRequest request)
-        {
-            return new EnemyBulletSpawnParams(
-                request.SpawnCount,
-                DefaultEnemyBulletDamage,
-                DefaultEnemyBulletLifetimeSeconds,
-                DefaultEnemyBulletAbsorbableEnergyAmount);
         }
 
         private void OnBossTitleOverlayFinished()

@@ -1,15 +1,47 @@
 using System;
+using System.Numerics;
 
 namespace Game.Domain.Battle
 {
     public class EnemyBullet
     {
         private float _lifetimeRemaining;
+        private float _elapsedSeconds;
         private bool _isInitialized;
+        private Vector3 _position;
+        private Vector3 _velocity;
+        private EnemyBulletBehaviorType _behaviorType;
 
         public int Damage { get; private set; }
 
         public int AbsorbableEnergyAmount { get; private set; }
+
+        public Vector3 Position
+        {
+            get
+            {
+                EnsureInitialized();
+                return _position;
+            }
+        }
+
+        public Vector3 Velocity
+        {
+            get
+            {
+                EnsureInitialized();
+                return _velocity;
+            }
+        }
+
+        public EnemyBulletBehaviorType BehaviorType
+        {
+            get
+            {
+                EnsureInitialized();
+                return _behaviorType;
+            }
+        }
 
         public float LifetimeRemaining
         {
@@ -17,6 +49,15 @@ namespace Game.Domain.Battle
             {
                 EnsureInitialized();
                 return _lifetimeRemaining;
+            }
+        }
+
+        public float ElapsedSeconds
+        {
+            get
+            {
+                EnsureInitialized();
+                return _elapsedSeconds;
             }
         }
 
@@ -29,22 +70,15 @@ namespace Game.Domain.Battle
             }
         }
 
-        public void Initialize(int damage, float lifetimeSeconds, int absorbableEnergyAmount)
+        public void Initialize(EnemyBulletSpawnRequest spawnRequest)
         {
-            if (damage < 0)
-                throw new ArgumentOutOfRangeException(nameof(damage), "damage must be non-negative.");
-            if (lifetimeSeconds <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(lifetimeSeconds), "lifetimeSeconds must be positive.");
-            if (absorbableEnergyAmount < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(absorbableEnergyAmount),
-                    "absorbableEnergyAmount must be non-negative.");
-            }
-
-            Damage = damage;
-            AbsorbableEnergyAmount = absorbableEnergyAmount;
-            _lifetimeRemaining = lifetimeSeconds;
+            Damage = spawnRequest.Damage;
+            AbsorbableEnergyAmount = spawnRequest.AbsorbableEnergyAmount;
+            _position = spawnRequest.Position;
+            _velocity = spawnRequest.Velocity;
+            _behaviorType = spawnRequest.BehaviorType;
+            _elapsedSeconds = 0f;
+            _lifetimeRemaining = spawnRequest.LifetimeSeconds;
             _isInitialized = true;
         }
 
@@ -55,9 +89,20 @@ namespace Game.Domain.Battle
             if (deltaTime <= 0f || IsVanished)
                 return;
 
+            _elapsedSeconds += deltaTime;
             _lifetimeRemaining -= deltaTime;
             if (_lifetimeRemaining <= 0f)
                 _lifetimeRemaining = 0f;
+        }
+
+        public void Translate(Vector3 delta)
+        {
+            EnsureInitialized();
+
+            if (IsVanished)
+                return;
+
+            _position += delta;
         }
 
         public void Vanish()

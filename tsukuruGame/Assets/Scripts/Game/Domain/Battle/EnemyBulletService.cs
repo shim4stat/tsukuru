@@ -10,27 +10,27 @@ namespace Game.Domain.Battle
         public IReadOnlyList<EnemyBullet> Spawn(
             BattleContext context,
             IBattleEntityFactory factory,
-            EnemyBulletSpawnParams spawnParams)
+            IReadOnlyList<EnemyBulletSpawnRequest> spawnRequests)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             if (factory == null)
                 throw new ArgumentNullException(nameof(factory));
+            if (spawnRequests == null)
+                throw new ArgumentNullException(nameof(spawnRequests));
 
-            ValidateSpawnParams(spawnParams);
+            if (spawnRequests.Count == 0)
+                return EmptyBullets;
+
             List<EnemyBullet> enemyBullets = GetEnemyBullets(context);
-            List<EnemyBullet> spawned = new List<EnemyBullet>(spawnParams.Count);
-            for (int i = 0; i < spawnParams.Count; i++)
+            List<EnemyBullet> spawned = new List<EnemyBullet>(spawnRequests.Count);
+            for (int i = 0; i < spawnRequests.Count; i++)
             {
                 EnemyBullet bullet = factory.CreateEnemyBullet();
                 if (bullet == null)
                     throw new InvalidOperationException("IBattleEntityFactory.CreateEnemyBullet returned null.");
 
-                bullet.Initialize(
-                    spawnParams.Damage,
-                    spawnParams.LifetimeSeconds,
-                    spawnParams.AbsorbableEnergyAmount);
-
+                bullet.Initialize(spawnRequests[i]);
                 enemyBullets.Add(bullet);
                 spawned.Add(bullet);
             }
@@ -54,6 +54,7 @@ namespace Game.Domain.Battle
                 if (bullet == null)
                     throw new InvalidOperationException($"BattleContext.EnemyBullets contains null at index {i}.");
 
+                ApplyBehavior(bullet, deltaTime);
                 bullet.Tick(deltaTime);
                 if (!bullet.IsVanished)
                     continue;
@@ -80,33 +81,25 @@ namespace Game.Domain.Battle
             bullet.Vanish();
         }
 
+        private static void ApplyBehavior(EnemyBullet bullet, float deltaTime)
+        {
+            switch (bullet.BehaviorType)
+            {
+                case EnemyBulletBehaviorType.Straight:
+                case EnemyBulletBehaviorType.Wave:
+                case EnemyBulletBehaviorType.Homing:
+                default:
+                    bullet.Translate(bullet.Velocity * deltaTime);
+                    break;
+            }
+        }
+
         private static List<EnemyBullet> GetEnemyBullets(BattleContext context)
         {
             if (context.EnemyBullets == null)
                 throw new InvalidOperationException("BattleContext.EnemyBullets is not initialized.");
 
             return context.EnemyBullets;
-        }
-
-        private static void ValidateSpawnParams(EnemyBulletSpawnParams spawnParams)
-        {
-            if (spawnParams.Count <= 0)
-                throw new ArgumentOutOfRangeException(nameof(spawnParams), "spawnParams.Count must be positive.");
-            if (spawnParams.Damage < 0)
-                throw new ArgumentOutOfRangeException(nameof(spawnParams), "spawnParams.Damage must be non-negative.");
-            if (spawnParams.LifetimeSeconds <= 0f)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(spawnParams),
-                    "spawnParams.LifetimeSeconds must be positive.");
-            }
-
-            if (spawnParams.AbsorbableEnergyAmount < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(spawnParams),
-                    "spawnParams.AbsorbableEnergyAmount must be non-negative.");
-            }
         }
     }
 }
