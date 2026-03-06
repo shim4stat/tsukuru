@@ -5,6 +5,7 @@ namespace Game.Domain.Battle
     /// <summary>
     /// Minimal spawn request payload produced by BossActionService.
     /// </summary>
+    [Obsolete("Use EnemyBulletSpawnRequest instead.", true)]
     public readonly struct BossActionSpawnRequest
     {
         public BossActionSpawnRequest(int phaseIndex, int spawnCount, float intervalSeconds)

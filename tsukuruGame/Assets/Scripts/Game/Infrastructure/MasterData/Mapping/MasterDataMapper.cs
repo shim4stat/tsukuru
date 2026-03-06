@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using NumericsVector3 = System.Numerics.Vector3;
 using Game.Contracts.MasterData.Models;
 using Game.Infrastructure.MasterData.Assets;
 
@@ -51,6 +52,20 @@ namespace Game.Infrastructure.MasterData.Mapping
                     gauges.Add(source[i]);
             }
 
+            List<BossPhasePatternContract> phasePatterns = new List<BossPhasePatternContract>();
+            IReadOnlyList<BossPhasePatternAsset> phaseSource = asset.PhasePatterns;
+            if (phaseSource != null)
+            {
+                for (int i = 0; i < phaseSource.Count; i++)
+                {
+                    BossPhasePatternAsset phase = phaseSource[i];
+                    if (phase == null)
+                        continue;
+
+                    phasePatterns.Add(ToContract(phase));
+                }
+            }
+
             return new BossParamsContract
             {
                 Id = asset.Id ?? string.Empty,
@@ -58,6 +73,7 @@ namespace Game.Infrastructure.MasterData.Mapping
                 BaseDropEnergyAmount = asset.BaseDropEnergyAmount,
                 MinDropIntervalSeconds = asset.MinDropIntervalSeconds,
                 ActionIntervalSeconds = asset.ActionIntervalSeconds,
+                PhasePatterns = phasePatterns,
             };
         }
 
@@ -108,6 +124,34 @@ namespace Game.Infrastructure.MasterData.Mapping
                 Id = asset.Id ?? string.Empty,
                 Pages = pages,
             };
+        }
+
+        private static BossPhasePatternContract ToContract(BossPhasePatternAsset asset)
+        {
+            if (asset == null)
+                throw new ArgumentNullException(nameof(asset));
+
+            return new BossPhasePatternContract
+            {
+                PatternType = asset.PatternType,
+                FireIntervalSeconds = asset.FireIntervalSeconds,
+                ShotCount = asset.ShotCount,
+                SpreadDegrees = asset.SpreadDegrees,
+                BurstShotCount = asset.BurstShotCount,
+                BurstShotIntervalSeconds = asset.BurstShotIntervalSeconds,
+                BulletSpeed = asset.BulletSpeed,
+                BulletLifetimeSeconds = asset.BulletLifetimeSeconds,
+                BulletDamage = asset.BulletDamage,
+                AbsorbableEnergyAmount = asset.AbsorbableEnergyAmount,
+                BulletBehaviorType = asset.BulletBehaviorType,
+                SpawnOffset = ToNumericsVector3(asset.SpawnOffset),
+                FireDirection = ToNumericsVector3(asset.FireDirection),
+            };
+        }
+
+        private static NumericsVector3 ToNumericsVector3(UnityEngine.Vector3 source)
+        {
+            return new NumericsVector3(source.x, source.y, source.z);
         }
     }
 }

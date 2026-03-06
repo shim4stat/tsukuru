@@ -2,6 +2,7 @@ using System;
 
 namespace Game.Domain.Battle
 {
+    [Obsolete("Use EnemyBulletSpawnRequest instead.", true)]
     public readonly struct EnemyBulletSpawnParams
     {
         public EnemyBulletSpawnParams(int count, int damage, float lifetimeSeconds, int absorbableEnergyAmount)

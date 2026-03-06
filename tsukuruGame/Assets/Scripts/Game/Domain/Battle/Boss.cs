@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Game.Contracts.MasterData.Models;
 
 namespace Game.Domain.Battle
@@ -8,7 +9,17 @@ namespace Game.Domain.Battle
         private int[] _gaugeMaxHps = Array.Empty<int>();
         private int _currentGaugeIndex;
         private int _currentHpInGauge;
+        private Vector3 _position;
         private bool _isInitialized;
+
+        public Vector3 Position
+        {
+            get
+            {
+                EnsureInitialized();
+                return _position;
+            }
+        }
 
         public void Initialize(BossParamsContract bossParams)
         {
@@ -31,7 +42,14 @@ namespace Game.Domain.Battle
             _gaugeMaxHps = gauges;
             _currentGaugeIndex = 0;
             _currentHpInGauge = _gaugeMaxHps[0];
+            _position = Vector3.Zero;
             _isInitialized = true;
+        }
+
+        public void SetPosition(Vector3 position)
+        {
+            EnsureInitialized();
+            _position = position;
         }
 
         public void TakeDamage(int amount)

@@ -4,6 +4,76 @@ using System.Numerics;
 
 namespace Game.Domain.Battle
 {
+    internal readonly struct BossBulletPatternConfig
+    {
+        private readonly Vector3 _spawnOffset;
+        private readonly Vector3 _fireDirection;
+        private readonly float _bulletSpeed;
+        private readonly int _damage;
+        private readonly float _lifetimeSeconds;
+        private readonly int _absorbableEnergyAmount;
+        private readonly EnemyBulletBehaviorType _behaviorType;
+
+        public BossBulletPatternConfig(
+            Vector3 spawnOffset,
+            Vector3 fireDirection,
+            float bulletSpeed,
+            int damage,
+            float lifetimeSeconds,
+            int absorbableEnergyAmount,
+            EnemyBulletBehaviorType behaviorType)
+        {
+            if (fireDirection.LengthSquared() <= 0f)
+                throw new ArgumentOutOfRangeException(nameof(fireDirection), "fireDirection must be non-zero.");
+            if (bulletSpeed <= 0f)
+                throw new ArgumentOutOfRangeException(nameof(bulletSpeed), "bulletSpeed must be positive.");
+            if (damage < 0)
+                throw new ArgumentOutOfRangeException(nameof(damage), "damage must be non-negative.");
+            if (lifetimeSeconds <= 0f)
+                throw new ArgumentOutOfRangeException(nameof(lifetimeSeconds), "lifetimeSeconds must be positive.");
+            if (absorbableEnergyAmount < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(absorbableEnergyAmount),
+                    "absorbableEnergyAmount must be non-negative.");
+            }
+
+            _spawnOffset = spawnOffset;
+            _fireDirection = Vector3.Normalize(fireDirection);
+            _bulletSpeed = bulletSpeed;
+            _damage = damage;
+            _lifetimeSeconds = lifetimeSeconds;
+            _absorbableEnergyAmount = absorbableEnergyAmount;
+            _behaviorType = behaviorType;
+        }
+
+        public Vector3 FireDirection => _fireDirection;
+
+        public EnemyBulletSpawnRequest CreateSpawnRequest(BattleContext context)
+        {
+            return CreateSpawnRequest(context, _fireDirection);
+        }
+
+        public EnemyBulletSpawnRequest CreateSpawnRequest(BattleContext context, Vector3 fireDirection)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            if (context.Boss == null)
+                throw new InvalidOperationException("BattleContext.Boss is not initialized.");
+            if (fireDirection.LengthSquared() <= 0f)
+                throw new ArgumentOutOfRangeException(nameof(fireDirection), "fireDirection must be non-zero.");
+
+            Vector3 normalizedDirection = Vector3.Normalize(fireDirection);
+            return new EnemyBulletSpawnRequest(
+                context.Boss.Position + _spawnOffset,
+                normalizedDirection * _bulletSpeed,
+                _damage,
+                _lifetimeSeconds,
+                _absorbableEnergyAmount,
+                _behaviorType);
+        }
+    }
+
     internal abstract class IntervalBossAttackPatternBase : IBossAttackPattern
     {
         private static readonly IReadOnlyList<EnemyBulletSpawnRequest> EmptyRequests = Array.Empty<EnemyBulletSpawnRequest>();
@@ -54,17 +124,17 @@ namespace Game.Domain.Battle
 
     internal sealed class SingleShotPattern : IntervalBossAttackPatternBase
     {
-        private readonly EnemyBulletSpawnRequest _spawnRequest;
+        private readonly BossBulletPatternConfig _bulletConfig;
 
-        public SingleShotPattern(float fireIntervalSeconds, EnemyBulletSpawnRequest spawnRequest)
+        public SingleShotPattern(float fireIntervalSeconds, BossBulletPatternConfig bulletConfig)
             : base(fireIntervalSeconds)
         {
-            _spawnRequest = spawnRequest;
+            _bulletConfig = bulletConfig;
         }
 
         protected override void EmitShots(BattleContext context, List<EnemyBulletSpawnRequest> requests)
         {
-            requests.Add(_spawnRequest);
+            requests.Add(_bulletConfig.CreateSpawnRequest(context));
         }
     }
 
@@ -72,48 +142,29 @@ namespace Game.Domain.Battle
     {
         private readonly int _shotCount;
         private readonly float _totalSpreadDegrees;
-        private readonly Vector3 _origin;
-        private readonly Vector3 _baseDirection;
-        private readonly float _bulletSpeed;
-        private readonly int _damage;
-        private readonly float _lifetimeSeconds;
-        private readonly int _absorbableEnergyAmount;
-        private readonly EnemyBulletBehaviorType _behaviorType;
+        private readonly BossBulletPatternConfig _bulletConfig;
 
         public NWayShotPattern(
             float fireIntervalSeconds,
             int shotCount,
             float totalSpreadDegrees,
-            Vector3 origin,
-            Vector3 baseDirection,
-            float bulletSpeed,
-            int damage,
-            float lifetimeSeconds,
-            int absorbableEnergyAmount,
-            EnemyBulletBehaviorType behaviorType)
+            BossBulletPatternConfig bulletConfig)
             : base(fireIntervalSeconds)
         {
             if (shotCount <= 0)
                 throw new ArgumentOutOfRangeException(nameof(shotCount), "shotCount must be positive.");
-            if (bulletSpeed <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(bulletSpeed), "bulletSpeed must be positive.");
 
             _shotCount = shotCount;
             _totalSpreadDegrees = totalSpreadDegrees;
-            _origin = origin;
-            _baseDirection = NormalizeDirection(baseDirection);
-            _bulletSpeed = bulletSpeed;
-            _damage = damage;
-            _lifetimeSeconds = lifetimeSeconds;
-            _absorbableEnergyAmount = absorbableEnergyAmount;
-            _behaviorType = behaviorType;
+            _bulletConfig = bulletConfig;
         }
 
         protected override void EmitShots(BattleContext context, List<EnemyBulletSpawnRequest> requests)
         {
+            Vector3 baseDirection = _bulletConfig.FireDirection;
             if (_shotCount == 1)
             {
-                requests.Add(CreateSpawnRequest(_baseDirection));
+                requests.Add(_bulletConfig.CreateSpawnRequest(context));
                 return;
             }
 
@@ -122,28 +173,9 @@ namespace Game.Domain.Battle
             for (int i = 0; i < _shotCount; i++)
             {
                 float angle = startAngle + (angleStep * i);
-                Vector3 direction = RotateAroundZ(_baseDirection, angle);
-                requests.Add(CreateSpawnRequest(direction));
+                Vector3 direction = RotateAroundZ(baseDirection, angle);
+                requests.Add(_bulletConfig.CreateSpawnRequest(context, direction));
             }
-        }
-
-        private EnemyBulletSpawnRequest CreateSpawnRequest(Vector3 direction)
-        {
-            return new EnemyBulletSpawnRequest(
-                _origin,
-                direction * _bulletSpeed,
-                _damage,
-                _lifetimeSeconds,
-                _absorbableEnergyAmount,
-                _behaviorType);
-        }
-
-        private static Vector3 NormalizeDirection(Vector3 direction)
-        {
-            if (direction.LengthSquared() <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(direction), "direction must be non-zero.");
-
-            return Vector3.Normalize(direction);
         }
 
         private static Vector3 RotateAroundZ(Vector3 vector, float degrees)
@@ -166,7 +198,7 @@ namespace Game.Domain.Battle
         private readonly float _burstIntervalSeconds;
         private readonly int _shotsPerBurst;
         private readonly float _shotIntervalSeconds;
-        private readonly EnemyBulletSpawnRequest _spawnRequest;
+        private readonly BossBulletPatternConfig _bulletConfig;
 
         private float _cooldownRemaining;
         private int _remainingShotsInBurst;
@@ -175,7 +207,7 @@ namespace Game.Domain.Battle
             float burstIntervalSeconds,
             int shotsPerBurst,
             float shotIntervalSeconds,
-            EnemyBulletSpawnRequest spawnRequest)
+            BossBulletPatternConfig bulletConfig)
         {
             if (burstIntervalSeconds <= 0f)
                 throw new ArgumentOutOfRangeException(nameof(burstIntervalSeconds), "burstIntervalSeconds must be positive.");
@@ -187,7 +219,7 @@ namespace Game.Domain.Battle
             _burstIntervalSeconds = burstIntervalSeconds;
             _shotsPerBurst = shotsPerBurst;
             _shotIntervalSeconds = shotIntervalSeconds;
-            _spawnRequest = spawnRequest;
+            _bulletConfig = bulletConfig;
 
             Reset();
         }
@@ -215,7 +247,7 @@ namespace Game.Domain.Battle
 
                 remainingTime -= _cooldownRemaining;
                 requests ??= new List<EnemyBulletSpawnRequest>();
-                requests.Add(_spawnRequest);
+                requests.Add(_bulletConfig.CreateSpawnRequest(context));
 
                 if (_remainingShotsInBurst == 0)
                 {

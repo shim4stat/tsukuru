@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using NumericsVector3 = System.Numerics.Vector3;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
@@ -18,6 +19,7 @@ namespace Game.Presentation.Game
 
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
+        [SerializeField] private Vector3 bossSpawnPosition = new Vector3(0f, 4f, 0f);
 
         private enum FlowState
         {
@@ -335,6 +337,7 @@ namespace Game.Presentation.Game
                 throw new InvalidOperationException("Boss master data is not initialized.");
 
             _battleContext.Boss.Initialize(_bossParams);
+            _battleContext.Boss.SetPosition(ToNumericsVector3(bossSpawnPosition));
         }
 
         private void InitializeGameHud()
@@ -484,6 +487,11 @@ namespace Game.Presentation.Game
 
             // 暫定対応: stage_01 の末尾数値を Domain.StageId(int) に変換する。
             return new StageId(numericId);
+        }
+
+        private static NumericsVector3 ToNumericsVector3(Vector3 source)
+        {
+            return new NumericsVector3(source.x, source.y, source.z);
         }
     }
 }
