@@ -6,5 +6,6 @@ namespace Game.Domain.Battle
         Robot CreateRobot();
         Boss CreateBoss();
         Enemy CreateEnemy();
+        EnemyBullet CreateEnemyBullet();
     }
 }
