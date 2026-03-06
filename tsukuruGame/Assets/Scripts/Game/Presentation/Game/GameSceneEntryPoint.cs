@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
@@ -14,6 +15,9 @@ namespace Game.Presentation.Game
     public sealed class GameSceneEntryPoint : MonoBehaviour
     {
         private const string DefaultClearRank = "C";
+        private const int DefaultEnemyBulletDamage = 1;
+        private const float DefaultEnemyBulletLifetimeSeconds = 2.0f;
+        private const int DefaultEnemyBulletAbsorbableEnergyAmount = 1;
 
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
@@ -34,8 +38,11 @@ namespace Game.Presentation.Game
         private PlayerParamsContract _playerParams;
         private BossParamsContract _bossParams;
         private BattleContext _battleContext;
+        private BattleEntityFactory _battleEntityFactory;
         private BattleFlowService _battleFlowService;
+        private BossActionService _bossActionService;
         private BossDamageService _bossDamageService;
+        private EnemyBulletService _enemyBulletService;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private FlowState _flowState = FlowState.Initializing;
@@ -107,8 +114,11 @@ namespace Game.Presentation.Game
             }
 
             _battleContext = null;
+            _battleEntityFactory = null;
             _battleFlowService = null;
+            _bossActionService = null;
             _bossDamageService = null;
+            _enemyBulletService = null;
             _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
             _stage = null;
@@ -169,10 +179,14 @@ namespace Game.Presentation.Game
         {
             StageId battleStageId = ParseBattleStageId(_session.CurrentStageId);
 
+            _battleEntityFactory = new BattleEntityFactory();
             _battleContext = new BattleContext();
-            _battleContext.Setup(battleStageId, new BattleEntityFactory());
+            _battleContext.Setup(battleStageId, _battleEntityFactory);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
+            _bossActionService = new BossActionService();
+            _bossActionService.Initialize(_battleContext.Boss, _bossParams);
+            _enemyBulletService = new EnemyBulletService();
         }
 
         private void StartBattleIfNeeded()
@@ -216,6 +230,12 @@ namespace Game.Presentation.Game
 
             _bossTitleOverlayPresenter?.ForceHide();
             HandleDebugBossDamageInput();
+
+            if (_battleContext.Phase == BattlePhase.Combat)
+            {
+                UpdateCombatEnemyBullets(Time.deltaTime);
+                ApplyBossActionRequests(Time.deltaTime);
+            }
 
             if (_battleContext.Phase == BattlePhase.BossDefeated)
             {
@@ -344,6 +364,35 @@ namespace Game.Presentation.Game
             _gameHudPresenter?.Hide();
         }
 
+        private void UpdateCombatEnemyBullets(float deltaTime)
+        {
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_enemyBulletService == null)
+                throw new InvalidOperationException("EnemyBulletService is not initialized.");
+
+            _enemyBulletService.Update(_battleContext, deltaTime);
+        }
+
+        private void ApplyBossActionRequests(float deltaTime)
+        {
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_battleEntityFactory == null)
+                throw new InvalidOperationException("BattleEntityFactory is not initialized.");
+            if (_bossActionService == null)
+                throw new InvalidOperationException("BossActionService is not initialized.");
+            if (_enemyBulletService == null)
+                throw new InvalidOperationException("EnemyBulletService is not initialized.");
+
+            IReadOnlyList<BossActionSpawnRequest> requests = _bossActionService.Update(_battleContext, deltaTime);
+            for (int i = 0; i < requests.Count; i++)
+            {
+                EnemyBulletSpawnParams spawnParams = BuildEnemyBulletSpawnParams(requests[i]);
+                _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, spawnParams);
+            }
+        }
+
         private void HandleDebugBossDamageInput()
         {
 #if UNITY_EDITOR
@@ -366,6 +415,15 @@ namespace Game.Presentation.Game
 #else
             return false;
 #endif
+        }
+
+        private static EnemyBulletSpawnParams BuildEnemyBulletSpawnParams(BossActionSpawnRequest request)
+        {
+            return new EnemyBulletSpawnParams(
+                request.SpawnCount,
+                DefaultEnemyBulletDamage,
+                DefaultEnemyBulletLifetimeSeconds,
+                DefaultEnemyBulletAbsorbableEnergyAmount);
         }
 
         private void OnBossTitleOverlayFinished()
