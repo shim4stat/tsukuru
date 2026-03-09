@@ -245,17 +245,17 @@
 
 ### 6.9 Boss（実体/行動の具体化）
 
-* BOSS-01 BossActionService最小（Combat中のみタイマー駆動でSpawnRequest生成）
-* BOSS-02 EnemyBullet最小（生成・更新・寿命/消滅判定）
+* BOSS-01 BossActionService最小（Combat中のみタイマー駆動で `EnemyBulletSpawnRequest` 生成）
+* BOSS-02 EnemyBullet最小（位置/速度/挙動種別を含む生成・更新・寿命/消滅判定）
 * BOSS-03 GameScene接続（Battle中にBossActionService.Updateを実行し、要求を反映）
 * BOSS-04 Boss被弾入口の統一（Robot側からの正式経路を1つに固定、EN-01と統合）
-* BOSS-05 フェーズ連動（GaugeIndexを参照した攻撃パターン切替の最小1種）
+* BOSS-05 フェーズ連動（GaugeIndexを参照した攻撃パターン切替。`SingleShot` / `NWayShot` / `BurstShot` まで実装済み）
 * BOSS-06 EnemySpawnService最小（フェーズに応じた雑魚スポーン要求1種）
 * BOSS-07 ドロップ間隔制限（0.1秒制限をDomainで担保）
 * BOSS-08 Retry初期化の完成（Boss/EnemyBullet/関連タイマのリセット）
 * BOSS-09 ボスHP複数ゲージUI（メイン＋サブゲージ表示）
 * BOSS-10 ボス撃破演出／リザルト表示（BossDefeatedフェーズ完了条件）
-* BOSS-11 フェーズ別攻撃パターンのMasterData化（ハードコード排除）
+* BOSS-11 フェーズ別攻撃パターンのMasterData化（Script側の schema / mapper / service 対応は実装済み。BossParamsAsset 実アセット整備と完全データ運用は未完）
 * BOSS-12 Boss被弾時ドロップ計算（基礎量×攻撃倍率）とSpawnRequest化
 * BOSS-13 ダッシュ接触によるBossダメージ経路（PL連携）を統合
 
