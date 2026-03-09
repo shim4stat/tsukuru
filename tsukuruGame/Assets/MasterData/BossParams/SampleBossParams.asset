@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: SampleBossParams
   m_EditorClassIdentifier: Game.Infrastructure::Game.Infrastructure.MasterData.Assets.BossParamsAsset
   id: boss_01
-  gaugeMaxHps: 64000000
+  gaugeMaxHps: 1e00000014000000
   baseDropEnergyAmount: 100
   minDropIntervalSeconds: 100
+  actionIntervalSeconds: 16
+  phasePatterns: []
