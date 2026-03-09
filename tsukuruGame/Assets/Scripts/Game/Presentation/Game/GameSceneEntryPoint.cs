@@ -5,6 +5,7 @@ using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
 using Game.Presentation.Common;
+using Game.Presentation.TestBoss;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -20,6 +21,8 @@ namespace Game.Presentation.Game
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
         [SerializeField] private Vector3 bossSpawnPosition = new Vector3(0f, 4f, 0f);
+        [SerializeField] private TestBossBossView testBossBossPrefab;
+        [SerializeField] private TestBossBulletView testBossBulletPrefab;
 
         private enum FlowState
         {
@@ -42,6 +45,7 @@ namespace Game.Presentation.Game
         private BossActionService _bossActionService;
         private BossDamageService _bossDamageService;
         private EnemyBulletService _enemyBulletService;
+        private TestBossBattleRuntime _testBossBattleRuntime;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private FlowState _flowState = FlowState.Initializing;
@@ -118,6 +122,8 @@ namespace Game.Presentation.Game
             _bossActionService = null;
             _bossDamageService = null;
             _enemyBulletService = null;
+            _testBossBattleRuntime?.Dispose();
+            _testBossBattleRuntime = null;
             _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
             _stage = null;
@@ -186,6 +192,7 @@ namespace Game.Presentation.Game
             _bossActionService = new BossActionService();
             _bossActionService.Initialize(_battleContext.Boss, _bossParams);
             _enemyBulletService = new EnemyBulletService();
+            InitializeTestBossBattleRuntimeIfNeeded();
         }
 
         private void StartBattleIfNeeded()
@@ -218,11 +225,13 @@ namespace Game.Presentation.Game
             if (_battleContext == null || _battleFlowService == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
-            RenderGameHud();
+            _testBossBattleRuntime?.TickBeforeBattleSimulation(Time.deltaTime);
             _battleFlowService.Update(_battleContext, _session, Time.deltaTime);
 
             if (_battleContext.Phase == BattlePhase.BossBoot)
             {
+                _testBossBattleRuntime?.TickAfterBattleSimulation();
+                RenderGameHud();
                 HandleBossBoot();
                 return;
             }
@@ -235,6 +244,9 @@ namespace Game.Presentation.Game
                 UpdateCombatEnemyBullets(Time.deltaTime);
                 ApplyBossActionRequests(Time.deltaTime);
             }
+
+            _testBossBattleRuntime?.TickAfterBattleSimulation();
+            RenderGameHud();
 
             if (_battleContext.Phase == BattlePhase.BossDefeated)
             {
@@ -321,6 +333,10 @@ namespace Game.Presentation.Game
                 throw new InvalidOperationException("Stage master data is not initialized.");
             if (string.IsNullOrWhiteSpace(_stage.Id))
                 throw new InvalidOperationException("StageDefinition.Id is null or empty.");
+
+            if (TestBossParamsResolver.TryResolve(_stage.Id, out BossParamsContract testBossParams))
+                return testBossParams;
+
             if (string.IsNullOrWhiteSpace(_stage.BossId))
                 throw new InvalidOperationException($"StageDefinition.BossId is null or empty. stageId={_stage.Id}");
 
@@ -338,6 +354,37 @@ namespace Game.Presentation.Game
 
             _battleContext.Boss.Initialize(_bossParams);
             _battleContext.Boss.SetPosition(ToNumericsVector3(bossSpawnPosition));
+        }
+
+        private void InitializeTestBossBattleRuntimeIfNeeded()
+        {
+            if (_stage == null || !TestBossSelector.ShouldUseForStage(_stage.Id))
+                return;
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_playerParams == null)
+                throw new InvalidOperationException("Player master data is not initialized.");
+            if (_enemyBulletService == null)
+                throw new InvalidOperationException("EnemyBulletService is not initialized.");
+
+            bool hasBossPrefab = testBossBossPrefab != null;
+            bool hasBulletPrefab = testBossBulletPrefab != null;
+            if (hasBossPrefab != hasBulletPrefab)
+            {
+                Debug.LogWarning(
+                    "Test boss prefab setup is incomplete. Falling back to runtime debug visuals. " +
+                    $"bossPrefabAssigned={hasBossPrefab}, bulletPrefabAssigned={hasBulletPrefab}",
+                    this);
+            }
+
+            _testBossBattleRuntime = new TestBossBattleRuntime(
+                transform,
+                _battleContext,
+                _playerParams,
+                _enemyBulletService,
+                testBossBossPrefab,
+                testBossBulletPrefab);
+            _testBossBattleRuntime.Initialize();
         }
 
         private void InitializeGameHud()
@@ -447,8 +494,14 @@ namespace Game.Presentation.Game
             int playerHpMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxHp : 1);
             int playerEnergyMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxEnergy : 1);
 
-            // 暫定値: Domain側の自機HP/エネルギー実装前は MasterData と固定値でHUDを成立させる。
-            int playerHpCurrent = playerHpMax;
+            if (_battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats)
+            {
+                playerHpMax = Mathf.Max(1, _battleContext.Player.MaxHp);
+            }
+
+            int playerHpCurrent = _battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats
+                ? Mathf.Clamp(_battleContext.Player.CurrentHp, 0, playerHpMax)
+                : playerHpMax;
             int playerEnergyCurrent = 0;
             bool showBossGauge = _battleContext != null && _battleContext.Boss != null;
             float bossHpNormalized = showBossGauge ? _battleContext.Boss.GetCurrentGaugeHpNormalized() : 0f;
