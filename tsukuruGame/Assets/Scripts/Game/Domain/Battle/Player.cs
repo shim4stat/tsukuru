@@ -15,7 +15,7 @@ namespace Game.Domain.Battle
         public float DashTimeRemaining { get; set; }
         public float DashCooldownRemaining { get; set; }
 
-        public Player(PlayerStaticParams staticParams, BattleContext battleContext)
+        public Player(PlayerStaticParams staticParams)
         {
             StaticParams = staticParams;
             MoveManager = new PlayerMoveManager(this);
