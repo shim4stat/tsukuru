@@ -23,9 +23,21 @@ namespace Game.Domain.Battle
         {
             string filepath = Path.Combine(_stageDir, $"stage_{stageId.Value}.json");
             var dto = _stageMapRepository.LoadStageMap(filepath);
+
+            if (dto == null)
+            {
+                throw new InvalidDataException($"Failed to load stage map from '{filepath}': repository returned null.");
+            }
+
+            var stageMap = StageMap.CreateFromDto(dto);
+            if (stageMap == null)
+            {
+                throw new InvalidDataException($"Failed to create StageMap from DTO for '{filepath}'.");
+            }
+
             var robot = new Robot
             {
-                StageMap = StageMap.CreateFromDto(dto)
+                StageMap = stageMap
             };
             return robot;
         }
