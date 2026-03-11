@@ -34,6 +34,11 @@ namespace Game.Infrastructure.MasterData.Mapping
                 MaxHp = asset.MaxHp,
                 MaxEnergy = asset.MaxEnergy,
                 MaxSpecialEnergy = asset.MaxSpecialEnergy,
+                WalkSpeed = asset.WalkSpeed,
+                DashSpeed = asset.DashSpeed,
+                DashDuration = asset.DashDuration,
+                DashCooldown = asset.DashCooldown,
+                DashDeceleration = asset.DashDeceleration,
             };
         }
 

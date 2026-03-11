@@ -1,9 +1,12 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Game.Domain.Battle
 {
     public class BattleContext
     {
+        private readonly IBattleEntityFactory _factory;
+        private readonly PlayerStaticParams _playerStaticParams;
+
         public BattlePhase Phase { get; private set; } = BattlePhase.BattleStart;
         public Player Player { get; private set; }
         public Robot Robot { get; private set; }
@@ -13,17 +16,23 @@ namespace Game.Domain.Battle
         public List<EnemyBullet> EnemyBullets { get; private set; } = new List<EnemyBullet>();
         public List<ItemInstance> Items { get; private set; } = new List<ItemInstance>();
 
+        public BattleContext(IBattleEntityFactory factory, PlayerStaticParams playerStaticParams)
+        {
+            _factory = factory;
+            _playerStaticParams = playerStaticParams;
+        }
+
         public void SetPhase(BattlePhase phase)
         {
             Phase = phase;
         }
 
-        public void Setup(StageId stageId, IBattleEntityFactory factory)
+        public void Setup(StageId stageId)
         {
             Phase = BattlePhase.BattleStart;
-            Player = factory.CreatePlayer();
-            Robot = factory.CreateRobot();
-            Boss = factory.CreateBoss();
+            Player = _factory.CreatePlayer(_playerStaticParams, this);
+            Robot = _factory.CreateRobot(stageId);
+            Boss = _factory.CreateBoss();
             Enemies = new List<Enemy>();
             RobotBullets = new List<RobotBullet>();
             EnemyBullets = new List<EnemyBullet>();
