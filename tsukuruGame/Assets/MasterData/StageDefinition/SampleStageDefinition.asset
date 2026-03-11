@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Game.Infrastructure::Game.Infrastructure.MasterData.Assets.StageDefinitionAsset
   id: stage_01
   displayName: "Samlple \u30A8\u30EA\u30A2"
+  bossId: boss_01
   orderIndex: 100
   hasIntroStory: 0
   introStoryId: 

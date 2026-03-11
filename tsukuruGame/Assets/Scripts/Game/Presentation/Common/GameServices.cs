@@ -12,6 +12,8 @@ namespace Game.Presentation.Common
     {
         public GameFlowUseCase GameFlowUseCase { get; }
 
+        public StageClearUseCase StageClearUseCase { get; }
+
         public OptionUseCase OptionUseCase { get; }
 
         public GameSession GameSession { get; }
@@ -24,6 +26,7 @@ namespace Game.Presentation.Common
 
         public GameServices(
             GameFlowUseCase gameFlowUseCase,
+            StageClearUseCase stageClearUseCase,
             OptionUseCase optionUseCase,
             GameSession gameSession,
             ISaveRepository saveRepository,
@@ -31,6 +34,7 @@ namespace Game.Presentation.Common
             IMasterDataRepository masterDataRepository)
         {
             GameFlowUseCase = gameFlowUseCase ?? throw new ArgumentNullException(nameof(gameFlowUseCase));
+            StageClearUseCase = stageClearUseCase ?? throw new ArgumentNullException(nameof(stageClearUseCase));
             OptionUseCase = optionUseCase ?? throw new ArgumentNullException(nameof(optionUseCase));
             GameSession = gameSession ?? throw new ArgumentNullException(nameof(gameSession));
             SaveRepository = saveRepository ?? throw new ArgumentNullException(nameof(saveRepository));
