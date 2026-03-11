@@ -30,7 +30,7 @@ namespace Game.Domain.Battle
         public void Setup(StageId stageId)
         {
             Phase = BattlePhase.BattleStart;
-            Player = _factory.CreatePlayer(_playerStaticParams, this);
+            Player = _factory.CreatePlayer(_playerStaticParams);
             Robot = _factory.CreateRobot(stageId);
             Boss = _factory.CreateBoss();
             Enemies = new List<Enemy>();

@@ -14,9 +14,9 @@ namespace Game.Domain.Battle
             _stageDir = stageDir;
         }
 
-        public Player CreatePlayer(PlayerStaticParams staticParams, BattleContext battleContext)
+        public Player CreatePlayer(PlayerStaticParams staticParams)
         {
-            return new Player(staticParams, battleContext);
+            return new Player(staticParams);
         }
 
         public Robot CreateRobot(StageId stageId)
