@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.termway.ide.antigravity": "https://github.com/TermWay/unity-ide-antigravity.git",
     "com.unity.2d.animation": "12.0.2",
     "com.unity.2d.aseprite": "2.0.2",
     "com.unity.2d.psdimporter": "11.0.1",

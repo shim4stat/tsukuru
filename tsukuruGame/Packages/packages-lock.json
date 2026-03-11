@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.termway.ide.antigravity": {
+      "version": "https://github.com/TermWay/unity-ide-antigravity.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "e5e981edf16a5c85f2c1a00209deee6626544bc5"
+    },
     "com.unity.2d.animation": {
       "version": "12.0.2",
       "depth": 0,

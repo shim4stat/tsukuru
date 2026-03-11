@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
+using Game.Infrastructure.Battle;
 using Game.Presentation.Common;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -169,8 +170,20 @@ namespace Game.Presentation.Game
         {
             StageId battleStageId = ParseBattleStageId(_session.CurrentStageId);
 
-            _battleContext = new BattleContext();
-            _battleContext.Setup(battleStageId, new BattleEntityFactory());
+            string stageDir = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle");
+            var repository = new StageMapRepository();
+            var factory = new BattleEntityFactory(repository, stageDir);
+
+            var playerStaticParams = new PlayerStaticParams(
+                _playerParams.MaxHp,
+                _playerParams.WalkSpeed,
+                _playerParams.DashSpeed,
+                _playerParams.DashDuration,
+                _playerParams.DashCooldown,
+                _playerParams.DashDeceleration);
+
+            _battleContext = new BattleContext(factory, playerStaticParams);
+            _battleContext.Setup(battleStageId);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
         }

@@ -453,6 +453,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Game.Presentation::Game.Presentation.TestEntryPoint
   keyInputManager: {fileID: 1289899452}
   playerController: {fileID: 1289899451}
+  playerParamsAsset: {fileID: 11400000, guid: e3dc38db8da6004469447bf6e025f062, type: 2}
 --- !u!114 &1289899451
 MonoBehaviour:
   m_ObjectHideFlags: 0
