@@ -35,10 +35,7 @@ namespace Game.Domain.Battle
                 throw new InvalidDataException($"Failed to create StageMap from DTO for '{filepath}'.");
             }
 
-            var robot = new Robot
-            {
-                StageMap = stageMap
-            };
+            var robot = new Robot(stageMap);
             return robot;
         }
 
