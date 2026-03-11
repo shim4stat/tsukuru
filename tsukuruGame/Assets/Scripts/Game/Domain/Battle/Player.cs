@@ -8,8 +8,8 @@ namespace Game.Domain.Battle
         public bool IsAlive() => true;
         public Vector3 Position;
 
-        public PlayerStaticParams StaticParams;
-        public PlayerMoveManager MoveManager;
+        public readonly PlayerStaticParams StaticParams;
+        private readonly PlayerMoveManager MoveManager;
 
         public bool IsDashing { get; set; }
         public float DashTimeRemaining { get; set; }
