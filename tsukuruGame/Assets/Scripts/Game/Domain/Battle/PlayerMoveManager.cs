@@ -335,7 +335,12 @@ namespace Game.Domain.Battle
         /// </summary>
         private bool CanMove(Robot robot, Vector2 currentPos, Vector2 dir)
         {
-            var stagemap = robot.StageMap;
+            if (robot == null)
+            {
+                throw new ArgumentNullException(nameof(robot));
+            }
+
+            var stagemap = robot.StageMap ?? throw new InvalidOperationException("Robot.StageMap is not initialized.");
             int x = (int)currentPos.X;
             int y = (int)currentPos.Y;
 
