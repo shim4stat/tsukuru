@@ -15,5 +15,7 @@ namespace Game.Contracts.MasterData.Models
         public int BaseDropEnergyAmount { get; set; }
 
         public float MinDropIntervalSeconds { get; set; }
+
+        public float ActionIntervalSeconds { get; set; }
     }
 }
