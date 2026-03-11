@@ -42,11 +42,11 @@ namespace Game.Domain.Battle
             this.player = player;
 
             // 初期位置の設定
-            _logicalPosition = player.StaticParams.initialPosition; // 仮位置。本来はStageSettings等から取得
+            _logicalPosition = player.StaticParams.InitialPosition; // 仮位置。本来はStageSettings等から取得
             _targetPosition = _logicalPosition;
             DisplayPosition = new Vector3(_logicalPosition.X, _logicalPosition.Y, 0);
 
-            _postDashSpeed = player.StaticParams.walkSpeed;
+            _postDashSpeed = player.StaticParams.WalkSpeed;
 
             // Playerへ初期位置を反映
             player.Position = DisplayPosition;
@@ -107,19 +107,19 @@ namespace Game.Domain.Battle
             float currentSpeed;
             if (player.IsDashing)
             {
-                currentSpeed = player.StaticParams.dashSpeed;
+                currentSpeed = player.StaticParams.DashSpeed;
             }
-            else if (_postDashSpeed > player.StaticParams.walkSpeed)
+            else if (_postDashSpeed > player.StaticParams.WalkSpeed)
             {
                 // ダッシュ終了後の減速中: dashDeceleration/秒で walkSpeed に向かって減速
-                _postDashSpeed -= player.StaticParams.dashDeceleration * deltaTime;
-                if (_postDashSpeed < player.StaticParams.walkSpeed)
-                    _postDashSpeed = player.StaticParams.walkSpeed;
+                _postDashSpeed -= player.StaticParams.DashDeceleration * deltaTime;
+                if (_postDashSpeed < player.StaticParams.WalkSpeed)
+                    _postDashSpeed = player.StaticParams.WalkSpeed;
                 currentSpeed = _postDashSpeed;
             }
             else
             {
-                currentSpeed = player.StaticParams.walkSpeed;
+                currentSpeed = player.StaticParams.WalkSpeed;
             }
 
             // --- 移動処理 ---
@@ -286,9 +286,9 @@ namespace Game.Domain.Battle
         private void StartDash()
         {
             player.IsDashing = true;
-            player.DashTimeRemaining = player.StaticParams.dashDuration;
-            player.DashCooldownRemaining = player.StaticParams.dashCooldown;
-            _postDashSpeed = player.StaticParams.dashSpeed;
+            player.DashTimeRemaining = player.StaticParams.DashDuration;
+            player.DashCooldownRemaining = player.StaticParams.DashCooldown;
+            _postDashSpeed = player.StaticParams.DashSpeed;
         }
 
         private void EndDash()
