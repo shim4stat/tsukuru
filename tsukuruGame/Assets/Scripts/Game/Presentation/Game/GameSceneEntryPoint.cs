@@ -45,7 +45,7 @@ namespace Game.Presentation.Game
         private BossActionService _bossActionService;
         private BossDamageService _bossDamageService;
         private EnemyBulletService _enemyBulletService;
-        private TestBossBattleRuntime _testBossBattleRuntime;
+        private BossBattleRuntime _bossBattleRuntime;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private FlowState _flowState = FlowState.Initializing;
@@ -122,8 +122,8 @@ namespace Game.Presentation.Game
             _bossActionService = null;
             _bossDamageService = null;
             _enemyBulletService = null;
-            _testBossBattleRuntime?.Dispose();
-            _testBossBattleRuntime = null;
+            _bossBattleRuntime?.Dispose();
+            _bossBattleRuntime = null;
             _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
             _stage = null;
@@ -192,7 +192,7 @@ namespace Game.Presentation.Game
             _bossActionService = new BossActionService();
             _bossActionService.Initialize(_battleContext.Boss, _bossParams);
             _enemyBulletService = new EnemyBulletService();
-            InitializeTestBossBattleRuntimeIfNeeded();
+            InitializeBossBattleRuntimeIfNeeded();
         }
 
         private void StartBattleIfNeeded()
@@ -225,12 +225,12 @@ namespace Game.Presentation.Game
             if (_battleContext == null || _battleFlowService == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
-            _testBossBattleRuntime?.TickBeforeBattleSimulation(Time.deltaTime);
+            _bossBattleRuntime?.TickBeforeBattleSimulation(Time.deltaTime);
             _battleFlowService.Update(_battleContext, _session, Time.deltaTime);
 
             if (_battleContext.Phase == BattlePhase.BossBoot)
             {
-                _testBossBattleRuntime?.TickAfterBattleSimulation();
+                _bossBattleRuntime?.TickAfterBattleSimulation();
                 RenderGameHud();
                 HandleBossBoot();
                 return;
@@ -245,7 +245,7 @@ namespace Game.Presentation.Game
                 ApplyBossActionRequests(Time.deltaTime);
             }
 
-            _testBossBattleRuntime?.TickAfterBattleSimulation();
+            _bossBattleRuntime?.TickAfterBattleSimulation();
             RenderGameHud();
 
             if (_battleContext.Phase == BattlePhase.BossDefeated)
@@ -356,7 +356,7 @@ namespace Game.Presentation.Game
             _battleContext.Boss.SetPosition(ToNumericsVector3(bossSpawnPosition));
         }
 
-        private void InitializeTestBossBattleRuntimeIfNeeded()
+        private void InitializeBossBattleRuntimeIfNeeded()
         {
             if (_stage == null || !TestBossSelector.ShouldUseForStage(_stage.Id))
                 return;
@@ -377,14 +377,14 @@ namespace Game.Presentation.Game
                     this);
             }
 
-            _testBossBattleRuntime = new TestBossBattleRuntime(
+            _bossBattleRuntime = new BossBattleRuntime(
                 transform,
                 _battleContext,
                 _playerParams,
                 _enemyBulletService,
                 testBossBossPrefab,
                 testBossBulletPrefab);
-            _testBossBattleRuntime.Initialize();
+            _bossBattleRuntime.Initialize();
         }
 
         private void InitializeGameHud()

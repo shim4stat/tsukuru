@@ -1,10 +1,11 @@
 ﻿using System;
+using Game.Presentation.Game;
 using NumericsVector3 = System.Numerics.Vector3;
 using UnityEngine;
 
 namespace Game.Presentation.TestBoss
 {
-    public sealed class TestBossBossView : MonoBehaviour, ITestBossTintableView
+    public sealed class TestBossBossView : MonoBehaviour, ITestBossTintableView, IBossBattleTintableView
     {
         [SerializeField] private Transform bodyRoot;
         [SerializeField] private GameObject hitboxRoot;

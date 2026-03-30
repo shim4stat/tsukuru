@@ -1,9 +1,10 @@
-﻿using NumericsVector3 = System.Numerics.Vector3;
+﻿using Game.Presentation.Game;
+using NumericsVector3 = System.Numerics.Vector3;
 using UnityEngine;
 
 namespace Game.Presentation.TestBoss
 {
-    public sealed class TestBossBulletView : MonoBehaviour, ITestBossEntityView
+    public sealed class TestBossBulletView : MonoBehaviour, ITestBossEntityView, IBossBattleEntityView
     {
         [SerializeField] private GameObject hitboxRoot;
         [SerializeField] private float hitboxRadius = TestBossConstants.BulletHitboxRadius;

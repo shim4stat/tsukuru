@@ -1,10 +1,11 @@
 ﻿using System;
+using Game.Presentation.Game;
 using NumericsVector3 = System.Numerics.Vector3;
 using UnityEngine;
 
 namespace Game.Presentation.TestBoss
 {
-    internal sealed class TestBossRuntimeCircleView : ITestBossTintableView
+    internal sealed class TestBossRuntimeCircleView : ITestBossTintableView, IBossBattleTintableView
     {
         private readonly GameObject _root;
         private readonly SpriteRenderer _bodyRenderer;

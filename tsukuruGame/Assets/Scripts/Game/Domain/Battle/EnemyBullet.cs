@@ -5,16 +5,28 @@ namespace Game.Domain.Battle
 {
     public class EnemyBullet
     {
+        private static int _nextRuntimeId;
+
         private float _lifetimeRemaining;
         private float _elapsedSeconds;
         private bool _isInitialized;
         private Vector3 _position;
         private Vector3 _velocity;
         private EnemyBulletBehaviorType _behaviorType;
+        private int _runtimeId;
 
         public int Damage { get; private set; }
 
         public int AbsorbableEnergyAmount { get; private set; }
+
+        public int RuntimeId
+        {
+            get
+            {
+                EnsureInitialized();
+                return _runtimeId;
+            }
+        }
 
         public Vector3 Position
         {
@@ -72,6 +84,7 @@ namespace Game.Domain.Battle
 
         public void Initialize(EnemyBulletSpawnRequest spawnRequest)
         {
+            _runtimeId = ++_nextRuntimeId;
             Damage = spawnRequest.Damage;
             AbsorbableEnergyAmount = spawnRequest.AbsorbableEnergyAmount;
             _position = spawnRequest.Position;
