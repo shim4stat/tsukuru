@@ -204,6 +204,15 @@ namespace Game.Presentation.Game
             if (_battleContext == null)
                 throw new InvalidOperationException("BattleContext is not initialized.");
 
+            if (itemPrefab == null)
+                throw new InvalidOperationException(
+                    "Item prefab is not assigned in GameSceneEntryPoint. " +
+                    "Please assign 'itemPrefab' in the scene (Inspector) for this GameScene.");
+
+            if (itemParent == null)
+                throw new InvalidOperationException(
+                    "Item parent transform is not assigned in GameSceneEntryPoint. " +
+                    "Please assign 'itemParent' in the scene (Inspector) for this GameScene.");
             _itemPresenter = new ItemPresenter(itemParent, itemPrefab);
             _itemPresenter.SpawnItems(_battleContext.Items);
         }
