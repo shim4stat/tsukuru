@@ -36,7 +36,7 @@ namespace Game.Domain.Battle
             Enemies = new List<Enemy>();
             RobotBullets = new List<RobotBullet>();
             EnemyBullets = new List<EnemyBullet>();
-            Items = new List<ItemInstance>();
+            Items = new List<ItemInstance>(Robot.Items);
         }
 
         public void ResetForRetry()
@@ -47,7 +47,7 @@ namespace Game.Domain.Battle
             Enemies.Clear();
             RobotBullets.Clear();
             EnemyBullets.Clear();
-            Items.Clear();
+            Items = new List<ItemInstance>(Robot.Items);
 
             // TODO: Reset Player and Boss state
         }
