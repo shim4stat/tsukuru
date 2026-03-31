@@ -47,7 +47,7 @@ namespace Game.Domain.Battle
             Enemies.Clear();
             RobotBullets.Clear();
             EnemyBullets.Clear();
-            Items.Clear();
+            Items = new List<ItemInstance>(Robot.Items);
 
             // TODO: Reset Player and Boss state
         }
