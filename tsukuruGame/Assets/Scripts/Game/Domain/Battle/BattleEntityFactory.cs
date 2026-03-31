@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using Game.Contracts.Battle;
 
 namespace Game.Domain.Battle
@@ -36,6 +38,20 @@ namespace Game.Domain.Battle
             }
 
             var robot = new Robot(stageMap);
+
+            if (dto.ItemPlacements != null)
+            {
+                var itemInstances = new List<ItemInstance>(dto.ItemPlacements.Count);
+                foreach (var placement in dto.ItemPlacements)
+                {
+                    if (!Enum.IsDefined(typeof(ItemType), placement.ItemType))
+                        throw new ArgumentException($"Unknown ItemType value: {placement.ItemType}", nameof(placement.ItemType));
+                    var itemType = (ItemType)placement.ItemType;
+                    itemInstances.Add(new ItemInstance(placement.CellX, placement.CellY, itemType));
+                }
+                robot.PlaceItems(itemInstances);
+            }
+
             return robot;
         }
 

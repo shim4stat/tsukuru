@@ -1,4 +1,6 @@
-﻿namespace Game.Contracts.Battle
+﻿using System.Collections.Generic;
+
+namespace Game.Contracts.Battle
 {
     public class StageMapDto
     {
@@ -6,5 +8,6 @@
         public int Height { get; set; }
         public bool[,] VerticalWalls { get; set; }
         public bool[,] HorizontalWalls { get; set; }
+        public List<ItemPlacementDto> ItemPlacements { get; set; }
     }
 }

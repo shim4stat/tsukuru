@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using Game.Contracts.Battle;
@@ -64,6 +65,20 @@ namespace Game.Infrastructure.Battle
                     }
                 }
 
+                if (mazeData.Items != null)
+                {
+                    dto.ItemPlacements = new List<ItemPlacementDto>(mazeData.Items.Count);
+                    foreach (var item in mazeData.Items)
+                    {
+                        dto.ItemPlacements.Add(new ItemPlacementDto
+                        {
+                            CellX = item.X,
+                            CellY = item.Y,
+                            ItemType = item.Type
+                        });
+                    }
+                }
+
                 return dto;
             }
             catch (Exception ex)
@@ -84,6 +99,21 @@ namespace Game.Infrastructure.Battle
 
             [JsonProperty("horizontal_walls")]
             public int[][] HorizontalWalls { get; set; }
+
+            [JsonProperty("items")]
+            public List<ItemJsonDto> Items { get; set; }
+        }
+
+        private class ItemJsonDto
+        {
+            [JsonProperty("x")]
+            public int X { get; set; }
+
+            [JsonProperty("y")]
+            public int Y { get; set; }
+
+            [JsonProperty("type")]
+            public int Type { get; set; }
         }
     }
 }
