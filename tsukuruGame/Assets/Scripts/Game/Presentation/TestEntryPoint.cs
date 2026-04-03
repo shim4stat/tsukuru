@@ -1,6 +1,7 @@
 ﻿using Game.Domain.Battle;
 using Game.Infrastructure.Battle;
 using Game.Infrastructure.MasterData.Assets;
+using Game.Presentation.Game.Battle;
 using UnityEngine;
 
 namespace Game.Presentation
@@ -10,8 +11,11 @@ namespace Game.Presentation
         [SerializeField] private KeyInputManager keyInputManager;
         [SerializeField] private PlayerController playerController;
         [SerializeField] private PlayerParamsAsset playerParamsAsset;
+        [SerializeField] private Transform itemParent;
+        [SerializeField] private GameObject itemPrefab;
 
         private BattleContext battleContext;
+        private ItemPresenter _itemPresenter;
 
         void Start()
         {
@@ -35,6 +39,29 @@ namespace Game.Presentation
 
             keyInputManager.Initialize(battleContext.Player, battleContext.Robot);
             playerController.Initialize(battleContext.Player);
+
+            SpawnBattleItems();
+        }
+
+        private void SpawnBattleItems()
+        {
+            if (itemPrefab == null || itemParent == null)
+            {
+                Debug.LogWarning("itemPrefab or itemParent is not assigned. Skipping item spawn.");
+                return;
+            }
+
+            _itemPresenter = new ItemPresenter(itemParent, itemPrefab);
+            _itemPresenter.SpawnItems(battleContext.Items);
+        }
+
+        private void OnDestroy()
+        {
+            if (_itemPresenter != null)
+            {
+                _itemPresenter.Dispose();
+                _itemPresenter = null;
+            }
         }
     }
 }
