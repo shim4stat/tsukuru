@@ -119,6 +119,37 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &71732636
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 71732637}
+  m_Layer: 0
+  m_Name: Items
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &71732637
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 71732636}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.0858, y: 0.12935, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &190436816
 GameObject:
   m_ObjectHideFlags: 0
@@ -454,6 +485,8 @@ MonoBehaviour:
   keyInputManager: {fileID: 1289899452}
   playerController: {fileID: 1289899451}
   playerParamsAsset: {fileID: 11400000, guid: e3dc38db8da6004469447bf6e025f062, type: 2}
+  itemParent: {fileID: 71732637}
+  itemPrefab: {fileID: 1171130259313247791, guid: b92e32eeb1be3f5418c1b78d8394f967, type: 3}
 --- !u!114 &1289899451
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -485,3 +518,4 @@ SceneRoots:
   - {fileID: 190436819}
   - {fileID: 1110733856}
   - {fileID: 1289899449}
+  - {fileID: 71732637}
