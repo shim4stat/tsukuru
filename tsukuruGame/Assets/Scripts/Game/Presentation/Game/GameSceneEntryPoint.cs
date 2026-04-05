@@ -42,7 +42,7 @@ namespace Game.Presentation.Game
         private BattleContext _battleContext;
         private BattleEntityFactory _battleEntityFactory;
         private BattleFlowService _battleFlowService;
-        private BossActionService _bossActionService;
+        private BossStateMachine _bossStateMachine;
         private BossDamageService _bossDamageService;
         private EnemyBulletService _enemyBulletService;
         private BossBattleRuntime _bossBattleRuntime;
@@ -119,7 +119,7 @@ namespace Game.Presentation.Game
             _battleContext = null;
             _battleEntityFactory = null;
             _battleFlowService = null;
-            _bossActionService = null;
+            _bossStateMachine = null;
             _bossDamageService = null;
             _enemyBulletService = null;
             _bossBattleRuntime?.Dispose();
@@ -189,8 +189,8 @@ namespace Game.Presentation.Game
             _battleContext.Setup(battleStageId, _battleEntityFactory);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
-            _bossActionService = new BossActionService();
-            _bossActionService.Initialize(_battleContext.Boss, _bossParams);
+            _bossStateMachine = new BossStateMachine();
+            _bossStateMachine.Initialize(_battleContext.Boss, _bossParams);
             _enemyBulletService = new EnemyBulletService();
             InitializeBossBattleRuntimeIfNeeded();
         }
@@ -233,6 +233,7 @@ namespace Game.Presentation.Game
                 _bossBattleRuntime?.TickAfterBattleSimulation();
                 RenderGameHud();
                 HandleBossBoot();
+                UpdateBossBehavior(Time.deltaTime);
                 return;
             }
 
@@ -242,7 +243,7 @@ namespace Game.Presentation.Game
             if (_battleContext.Phase == BattlePhase.Combat)
             {
                 UpdateCombatEnemyBullets(Time.deltaTime);
-                ApplyBossActionRequests(Time.deltaTime);
+                UpdateBossBehavior(Time.deltaTime);
             }
 
             _bossBattleRuntime?.TickAfterBattleSimulation();
@@ -421,19 +422,20 @@ namespace Game.Presentation.Game
             _enemyBulletService.Update(_battleContext, deltaTime);
         }
 
-        private void ApplyBossActionRequests(float deltaTime)
+        private void UpdateBossBehavior(float deltaTime)
         {
             if (_battleContext == null)
                 throw new InvalidOperationException("BattleContext is not initialized.");
             if (_battleEntityFactory == null)
                 throw new InvalidOperationException("BattleEntityFactory is not initialized.");
-            if (_bossActionService == null)
-                throw new InvalidOperationException("BossActionService is not initialized.");
+            if (_bossStateMachine == null)
+                throw new InvalidOperationException("BossStateMachine is not initialized.");
             if (_enemyBulletService == null)
                 throw new InvalidOperationException("EnemyBulletService is not initialized.");
 
-            IReadOnlyList<EnemyBulletSpawnRequest> requests = _bossActionService.Update(_battleContext, deltaTime);
-            _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, requests);
+            BossBehaviorUpdateResult updateResult = _bossStateMachine.Update(_battleContext, deltaTime);
+            _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, updateResult.SpawnRequests);
+            HandleBossBehaviorSignal(updateResult.Signal);
         }
 
         private void HandleDebugBossDamageInput()
@@ -444,10 +446,10 @@ namespace Game.Presentation.Game
 
             if (_bossDamageService == null)
                 throw new InvalidOperationException("BossDamageService is not initialized.");
-            if (_battleContext == null || _battleFlowService == null || _session == null)
+            if (_battleContext == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
-            _bossDamageService.ApplyBossDamage(_battleContext, _session, _battleFlowService, 1);
+            _bossDamageService.ApplyBossDamage(_battleContext, 1);
 #endif
         }
 
@@ -462,13 +464,36 @@ namespace Game.Presentation.Game
 
         private void OnBossTitleOverlayFinished()
         {
-            if (_battleContext == null || _battleFlowService == null || _session == null)
+            if (_battleContext == null || _bossStateMachine == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
             if (_battleContext.Phase != BattlePhase.BossBoot)
                 return;
 
-            _battleFlowService.OnBossBootFinished(_battleContext, _session);
+            _bossStateMachine.NotifySignal(BossStateSignalIds.IntroFinished);
+        }
+
+        private void HandleBossBehaviorSignal(BossBehaviorSignal signal)
+        {
+            if (signal == BossBehaviorSignal.None)
+                return;
+            if (_battleContext == null || _battleFlowService == null || _session == null)
+                throw new InvalidOperationException("Battle runtime is not initialized.");
+
+            switch (signal)
+            {
+                case BossBehaviorSignal.IntroCompleted:
+                    if (_battleContext.Phase == BattlePhase.BossBoot)
+                        _battleFlowService.OnBossBootFinished(_battleContext, _session);
+                    break;
+                case BossBehaviorSignal.DeadCompleted:
+                    if (_battleContext.Phase == BattlePhase.Combat)
+                        _battleFlowService.OnCombatBossHpZero(_battleContext, _session);
+                    break;
+                case BossBehaviorSignal.None:
+                default:
+                    break;
+            }
         }
 
         private string ResolveBossTitleText()

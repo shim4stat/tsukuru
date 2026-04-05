@@ -1,267 +1,286 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Game.Contracts.MasterData.Models;
 
 namespace Game.Domain.Battle
 {
-    internal readonly struct BossBulletPatternConfig
+    /// <summary>
+    /// フェーズ別の明示設定が無い場合に使う既定弾幕を構築する。
+    /// </summary>
+    internal static class BossPhasePatternDefaults
     {
-        private readonly Vector3 _spawnOffset;
-        private readonly Vector3 _fireDirection;
-        private readonly float _bulletSpeed;
-        private readonly int _damage;
-        private readonly float _lifetimeSeconds;
-        private readonly int _absorbableEnergyAmount;
-        private readonly EnemyBulletBehaviorType _behaviorType;
+        private static readonly Vector3 DefaultFireDirection = new Vector3(0f, -1f, 0f);
+        private static readonly Vector3 DefaultSpawnOffset = Vector3.Zero;
 
-        public BossBulletPatternConfig(
-            Vector3 spawnOffset,
-            Vector3 fireDirection,
-            float bulletSpeed,
-            int damage,
-            float lifetimeSeconds,
-            int absorbableEnergyAmount,
-            EnemyBulletBehaviorType behaviorType)
+        private const float DefaultBulletSpeed = 3.0f;
+        private const float DefaultBulletLifetimeSeconds = 2.0f;
+        private const int DefaultBulletDamage = 1;
+        private const int DefaultBulletAbsorbableEnergyAmount = 1;
+        private const int DefaultNWayShotCount = 3;
+        private const float DefaultNWaySpreadDegrees = 30.0f;
+        private const int DefaultBurstShotCount = 3;
+        private const float DefaultBurstShotIntervalSeconds = 0.15f;
+
+        public static IReadOnlyList<BossPhasePatternContract> BuildFallbackPhasePatterns(BossParamsContract bossParams)
         {
-            if (fireDirection.LengthSquared() <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(fireDirection), "fireDirection must be non-zero.");
-            if (bulletSpeed <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(bulletSpeed), "bulletSpeed must be positive.");
-            if (damage < 0)
-                throw new ArgumentOutOfRangeException(nameof(damage), "damage must be non-negative.");
-            if (lifetimeSeconds <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(lifetimeSeconds), "lifetimeSeconds must be positive.");
-            if (absorbableEnergyAmount < 0)
+            if (bossParams == null)
+                throw new ArgumentNullException(nameof(bossParams));
+            if (bossParams.ActionIntervalSeconds <= 0f)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(absorbableEnergyAmount),
-                    "absorbableEnergyAmount must be non-negative.");
+                throw new InvalidOperationException(
+                    $"Boss action interval must be positive when fallback patterns are used. actionIntervalSeconds={bossParams.ActionIntervalSeconds}");
             }
 
-            _spawnOffset = spawnOffset;
-            _fireDirection = Vector3.Normalize(fireDirection);
-            _bulletSpeed = bulletSpeed;
-            _damage = damage;
-            _lifetimeSeconds = lifetimeSeconds;
-            _absorbableEnergyAmount = absorbableEnergyAmount;
-            _behaviorType = behaviorType;
-        }
-
-        public Vector3 FireDirection => _fireDirection;
-
-        public EnemyBulletSpawnRequest CreateSpawnRequest(BattleContext context)
-        {
-            return CreateSpawnRequest(context, _fireDirection);
-        }
-
-        public EnemyBulletSpawnRequest CreateSpawnRequest(BattleContext context, Vector3 fireDirection)
-        {
-            if (context == null)
-                throw new ArgumentNullException(nameof(context));
-            if (context.Boss == null)
-                throw new InvalidOperationException("BattleContext.Boss is not initialized.");
-            if (fireDirection.LengthSquared() <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(fireDirection), "fireDirection must be non-zero.");
-
-            Vector3 normalizedDirection = Vector3.Normalize(fireDirection);
-            return new EnemyBulletSpawnRequest(
-                context.Boss.Position + _spawnOffset,
-                normalizedDirection * _bulletSpeed,
-                _damage,
-                _lifetimeSeconds,
-                _absorbableEnergyAmount,
-                _behaviorType);
-        }
-    }
-
-    internal abstract class IntervalBossAttackPatternBase : IBossAttackPattern
-    {
-        private static readonly IReadOnlyList<EnemyBulletSpawnRequest> EmptyRequests = Array.Empty<EnemyBulletSpawnRequest>();
-
-        private readonly float _fireIntervalSeconds;
-        private float _cooldownRemaining;
-
-        protected IntervalBossAttackPatternBase(float fireIntervalSeconds)
-        {
-            if (fireIntervalSeconds <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(fireIntervalSeconds), "fireIntervalSeconds must be positive.");
-
-            _fireIntervalSeconds = fireIntervalSeconds;
-            _cooldownRemaining = fireIntervalSeconds;
-        }
-
-        public virtual void Reset()
-        {
-            _cooldownRemaining = _fireIntervalSeconds;
-        }
-
-        public IReadOnlyList<EnemyBulletSpawnRequest> Update(BattleContext context, float deltaTime)
-        {
-            if (deltaTime <= 0f)
-                return EmptyRequests;
-
-            List<EnemyBulletSpawnRequest> requests = null;
-            float remainingTime = deltaTime;
-            while (remainingTime > 0f)
+            List<BossPhasePatternContract> phasePatterns = new List<BossPhasePatternContract>(bossParams.GaugeMaxHps.Count);
+            for (int i = 0; i < bossParams.GaugeMaxHps.Count; i++)
             {
-                if (_cooldownRemaining > remainingTime)
+                // 序盤は単発、中盤は拡散、最終ゲージは連射で圧を上げる単純な既定値。
+                if (i == 0)
                 {
-                    _cooldownRemaining -= remainingTime;
-                    break;
+                    phasePatterns.Add(
+                        CreateSingleShotPhasePattern(
+                            bossParams.ActionIntervalSeconds,
+                            DefaultFireDirection));
+                    continue;
                 }
 
-                remainingTime -= _cooldownRemaining;
-                requests ??= new List<EnemyBulletSpawnRequest>();
-                EmitShots(context, requests);
-                _cooldownRemaining = _fireIntervalSeconds;
+                if (i == bossParams.GaugeMaxHps.Count - 1)
+                {
+                    phasePatterns.Add(
+                        CreateBurstShotPhasePattern(
+                            bossParams.ActionIntervalSeconds,
+                            DefaultBurstShotCount,
+                            DefaultBurstShotIntervalSeconds,
+                            DefaultFireDirection));
+                    continue;
+                }
+
+                phasePatterns.Add(
+                    CreateNWayShotPhasePattern(
+                        bossParams.ActionIntervalSeconds,
+                        DefaultNWayShotCount,
+                        DefaultNWaySpreadDegrees,
+                        DefaultFireDirection));
             }
 
-            return requests ?? EmptyRequests;
+            return phasePatterns;
         }
 
-        protected abstract void EmitShots(BattleContext context, List<EnemyBulletSpawnRequest> requests);
-    }
-
-    internal sealed class SingleShotPattern : IntervalBossAttackPatternBase
-    {
-        private readonly BossBulletPatternConfig _bulletConfig;
-
-        public SingleShotPattern(float fireIntervalSeconds, BossBulletPatternConfig bulletConfig)
-            : base(fireIntervalSeconds)
+        private static BossPhasePatternContract CreateSingleShotPhasePattern(float fireIntervalSeconds, Vector3 fireDirection)
         {
-            _bulletConfig = bulletConfig;
+            return CreateBasePhasePattern(BossAttackPatternType.SingleShot, fireIntervalSeconds, fireDirection);
         }
 
-        protected override void EmitShots(BattleContext context, List<EnemyBulletSpawnRequest> requests)
-        {
-            requests.Add(_bulletConfig.CreateSpawnRequest(context));
-        }
-    }
-
-    internal sealed class NWayShotPattern : IntervalBossAttackPatternBase
-    {
-        private readonly int _shotCount;
-        private readonly float _totalSpreadDegrees;
-        private readonly BossBulletPatternConfig _bulletConfig;
-
-        public NWayShotPattern(
+        private static BossPhasePatternContract CreateNWayShotPhasePattern(
             float fireIntervalSeconds,
             int shotCount,
-            float totalSpreadDegrees,
-            BossBulletPatternConfig bulletConfig)
-            : base(fireIntervalSeconds)
+            float spreadDegrees,
+            Vector3 fireDirection)
         {
-            if (shotCount <= 0)
-                throw new ArgumentOutOfRangeException(nameof(shotCount), "shotCount must be positive.");
-
-            _shotCount = shotCount;
-            _totalSpreadDegrees = totalSpreadDegrees;
-            _bulletConfig = bulletConfig;
+            BossPhasePatternContract phasePattern = CreateBasePhasePattern(BossAttackPatternType.NWayShot, fireIntervalSeconds, fireDirection);
+            phasePattern.ShotCount = shotCount;
+            phasePattern.SpreadDegrees = spreadDegrees;
+            return phasePattern;
         }
 
-        protected override void EmitShots(BattleContext context, List<EnemyBulletSpawnRequest> requests)
+        private static BossPhasePatternContract CreateBurstShotPhasePattern(
+            float fireIntervalSeconds,
+            int burstShotCount,
+            float burstShotIntervalSeconds,
+            Vector3 fireDirection)
         {
-            Vector3 baseDirection = _bulletConfig.FireDirection;
-            if (_shotCount == 1)
-            {
-                requests.Add(_bulletConfig.CreateSpawnRequest(context));
-                return;
-            }
-
-            float angleStep = _totalSpreadDegrees / (_shotCount - 1);
-            float startAngle = -_totalSpreadDegrees * 0.5f;
-            for (int i = 0; i < _shotCount; i++)
-            {
-                float angle = startAngle + (angleStep * i);
-                Vector3 direction = RotateAroundZ(baseDirection, angle);
-                requests.Add(_bulletConfig.CreateSpawnRequest(context, direction));
-            }
+            BossPhasePatternContract phasePattern = CreateBasePhasePattern(BossAttackPatternType.BurstShot, fireIntervalSeconds, fireDirection);
+            phasePattern.BurstShotCount = burstShotCount;
+            phasePattern.BurstShotIntervalSeconds = burstShotIntervalSeconds;
+            return phasePattern;
         }
 
-        private static Vector3 RotateAroundZ(Vector3 vector, float degrees)
+        private static BossPhasePatternContract CreateBasePhasePattern(
+            BossAttackPatternType patternType,
+            float fireIntervalSeconds,
+            Vector3 fireDirection)
         {
-            float radians = degrees * (float)Math.PI / 180f;
-            float cos = (float)Math.Cos(radians);
-            float sin = (float)Math.Sin(radians);
+            Vector3 normalizedDirection = fireDirection.LengthSquared() > 0f
+                ? Vector3.Normalize(fireDirection)
+                : DefaultFireDirection;
 
-            return new Vector3(
-                (vector.X * cos) - (vector.Y * sin),
-                (vector.X * sin) + (vector.Y * cos),
-                vector.Z);
+            return new BossPhasePatternContract
+            {
+                PatternType = patternType,
+                FireIntervalSeconds = fireIntervalSeconds,
+                ShotCount = 1,
+                SpreadDegrees = 0f,
+                BurstShotCount = DefaultBurstShotCount,
+                BurstShotIntervalSeconds = DefaultBurstShotIntervalSeconds,
+                BulletSpeed = DefaultBulletSpeed,
+                BulletLifetimeSeconds = DefaultBulletLifetimeSeconds,
+                BulletDamage = DefaultBulletDamage,
+                AbsorbableEnergyAmount = DefaultBulletAbsorbableEnergyAmount,
+                BulletBehaviorType = EnemyBulletBehaviorTypeContract.Straight,
+                SpawnOffset = DefaultSpawnOffset,
+                FireDirection = normalizedDirection,
+            };
         }
     }
 
-    internal sealed class BurstShotPattern : IBossAttackPattern
+    /// <summary>
+    /// マスターデータ上の攻撃定義をランタイムの弾幕パターンへ変換するファクトリ。
+    /// </summary>
+    internal static class BossAttackPatternFactory
     {
-        private static readonly IReadOnlyList<EnemyBulletSpawnRequest> EmptyRequests = Array.Empty<EnemyBulletSpawnRequest>();
-
-        private readonly float _burstIntervalSeconds;
-        private readonly int _shotsPerBurst;
-        private readonly float _shotIntervalSeconds;
-        private readonly BossBulletPatternConfig _bulletConfig;
-
-        private float _cooldownRemaining;
-        private int _remainingShotsInBurst;
-
-        public BurstShotPattern(
-            float burstIntervalSeconds,
-            int shotsPerBurst,
-            float shotIntervalSeconds,
-            BossBulletPatternConfig bulletConfig)
+        public static IBossAttackPattern BuildPattern(BossAttackDefinitionContract attackDefinition)
         {
-            if (burstIntervalSeconds <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(burstIntervalSeconds), "burstIntervalSeconds must be positive.");
-            if (shotsPerBurst <= 0)
-                throw new ArgumentOutOfRangeException(nameof(shotsPerBurst), "shotsPerBurst must be positive.");
-            if (shotIntervalSeconds <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(shotIntervalSeconds), "shotIntervalSeconds must be positive.");
+            if (attackDefinition == null)
+                throw new ArgumentNullException(nameof(attackDefinition));
 
-            _burstIntervalSeconds = burstIntervalSeconds;
-            _shotsPerBurst = shotsPerBurst;
-            _shotIntervalSeconds = shotIntervalSeconds;
-            _bulletConfig = bulletConfig;
-
-            Reset();
-        }
-
-        public void Reset()
-        {
-            _cooldownRemaining = _burstIntervalSeconds;
-            _remainingShotsInBurst = 0;
-        }
-
-        public IReadOnlyList<EnemyBulletSpawnRequest> Update(BattleContext context, float deltaTime)
-        {
-            if (deltaTime <= 0f)
-                return EmptyRequests;
-
-            List<EnemyBulletSpawnRequest> requests = null;
-            float remainingTime = deltaTime;
-            while (remainingTime > 0f)
+            BossPhasePatternContract phasePattern = new BossPhasePatternContract
             {
-                if (_cooldownRemaining > remainingTime)
-                {
-                    _cooldownRemaining -= remainingTime;
-                    break;
-                }
+                PatternType = attackDefinition.PatternType,
+                FireIntervalSeconds = attackDefinition.FireIntervalSeconds,
+                ShotCount = attackDefinition.ShotCount,
+                SpreadDegrees = attackDefinition.SpreadDegrees,
+                BurstShotCount = attackDefinition.BurstShotCount,
+                BurstShotIntervalSeconds = attackDefinition.BurstShotIntervalSeconds,
+                BulletSpeed = attackDefinition.BulletSpeed,
+                BulletLifetimeSeconds = attackDefinition.BulletLifetimeSeconds,
+                BulletDamage = attackDefinition.BulletDamage,
+                AbsorbableEnergyAmount = attackDefinition.AbsorbableEnergyAmount,
+                BulletBehaviorType = attackDefinition.BulletBehaviorType,
+                SpawnOffset = attackDefinition.SpawnOffset,
+                FireDirection = attackDefinition.FireDirection,
+            };
 
-                remainingTime -= _cooldownRemaining;
-                requests ??= new List<EnemyBulletSpawnRequest>();
-                requests.Add(_bulletConfig.CreateSpawnRequest(context));
+            return Create(phasePattern);
+        }
 
-                if (_remainingShotsInBurst == 0)
-                {
-                    _remainingShotsInBurst = _shotsPerBurst - 1;
-                }
-                else
-                {
-                    _remainingShotsInBurst--;
-                }
+        public static IBossAttackPattern[] BuildPatternsByGauge(BossParamsContract bossParams)
+        {
+            if (bossParams == null)
+                throw new ArgumentNullException(nameof(bossParams));
 
-                _cooldownRemaining = _remainingShotsInBurst > 0 ? _shotIntervalSeconds : _burstIntervalSeconds;
+            IReadOnlyList<BossPhasePatternContract> phasePatterns = bossParams.PhasePatterns;
+            if (phasePatterns == null || phasePatterns.Count == 0)
+                phasePatterns = BossPhasePatternDefaults.BuildFallbackPhasePatterns(bossParams);
+
+            if (phasePatterns.Count != bossParams.GaugeMaxHps.Count)
+            {
+                throw new InvalidOperationException(
+                    $"Boss phase pattern count must match gauge count. gaugeCount={bossParams.GaugeMaxHps.Count}, phasePatternCount={phasePatterns.Count}");
             }
 
-            return requests ?? EmptyRequests;
+            IBossAttackPattern[] patterns = new IBossAttackPattern[phasePatterns.Count];
+            for (int i = 0; i < phasePatterns.Count; i++)
+            {
+                BossPhasePatternContract phasePattern = phasePatterns[i];
+                if (phasePattern == null)
+                    throw new InvalidOperationException($"Boss phase pattern is null at index {i}.");
+
+                patterns[i] = Create(phasePattern);
+            }
+
+            return patterns;
+        }
+
+        private static IBossAttackPattern Create(BossPhasePatternContract phasePattern)
+        {
+            // 契約モデルを具体的なパターン実装へ解決する。
+            BossBulletPatternConfig bulletConfig = CreateBulletConfig(phasePattern);
+            switch (phasePattern.PatternType)
+            {
+                case BossAttackPatternType.SingleShot:
+                    ValidateSingleShot(phasePattern);
+                    return new SingleShotPattern(phasePattern.FireIntervalSeconds, bulletConfig);
+                case BossAttackPatternType.NWayShot:
+                    ValidateNWayShot(phasePattern);
+                    return new NWayShotPattern(
+                        phasePattern.FireIntervalSeconds,
+                        phasePattern.ShotCount,
+                        phasePattern.SpreadDegrees,
+                        bulletConfig);
+                case BossAttackPatternType.BurstShot:
+                    ValidateBurstShot(phasePattern);
+                    return new BurstShotPattern(
+                        phasePattern.FireIntervalSeconds,
+                        phasePattern.BurstShotCount,
+                        phasePattern.BurstShotIntervalSeconds,
+                        bulletConfig);
+                default:
+                    throw new InvalidOperationException($"Unsupported boss attack pattern type: {phasePattern.PatternType}");
+            }
+        }
+
+        private static BossBulletPatternConfig CreateBulletConfig(BossPhasePatternContract phasePattern)
+        {
+            return new BossBulletPatternConfig(
+                phasePattern.SpawnOffset,
+                phasePattern.FireDirection,
+                phasePattern.BulletSpeed,
+                phasePattern.BulletDamage,
+                phasePattern.BulletLifetimeSeconds,
+                phasePattern.AbsorbableEnergyAmount,
+                MapBehaviorType(phasePattern.BulletBehaviorType));
+        }
+
+        private static void ValidateSingleShot(BossPhasePatternContract phasePattern)
+        {
+            if (phasePattern.FireIntervalSeconds <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"SingleShot fire interval must be positive. fireIntervalSeconds={phasePattern.FireIntervalSeconds}");
+            }
+        }
+
+        private static void ValidateNWayShot(BossPhasePatternContract phasePattern)
+        {
+            if (phasePattern.FireIntervalSeconds <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"NWayShot fire interval must be positive. fireIntervalSeconds={phasePattern.FireIntervalSeconds}");
+            }
+
+            if (phasePattern.ShotCount <= 0)
+            {
+                throw new InvalidOperationException(
+                    $"NWayShot shot count must be positive. shotCount={phasePattern.ShotCount}");
+            }
+        }
+
+        private static void ValidateBurstShot(BossPhasePatternContract phasePattern)
+        {
+            if (phasePattern.FireIntervalSeconds <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"BurstShot fire interval must be positive. fireIntervalSeconds={phasePattern.FireIntervalSeconds}");
+            }
+
+            if (phasePattern.BurstShotCount <= 0)
+            {
+                throw new InvalidOperationException(
+                    $"BurstShot burst shot count must be positive. burstShotCount={phasePattern.BurstShotCount}");
+            }
+
+            if (phasePattern.BurstShotIntervalSeconds <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"BurstShot interval must be positive. burstShotIntervalSeconds={phasePattern.BurstShotIntervalSeconds}");
+            }
+        }
+
+        private static EnemyBulletBehaviorType MapBehaviorType(EnemyBulletBehaviorTypeContract behaviorType)
+        {
+            // マスターデータの列挙値をドメイン側の列挙値へ写像する。
+            switch (behaviorType)
+            {
+                case EnemyBulletBehaviorTypeContract.Straight:
+                    return EnemyBulletBehaviorType.Straight;
+                case EnemyBulletBehaviorTypeContract.Wave:
+                    return EnemyBulletBehaviorType.Wave;
+                case EnemyBulletBehaviorTypeContract.Homing:
+                    return EnemyBulletBehaviorType.Homing;
+                default:
+                    throw new InvalidOperationException($"Unsupported enemy bullet behavior type: {behaviorType}");
+            }
         }
     }
 }
