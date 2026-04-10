@@ -5,6 +5,9 @@ using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
 using Game.Presentation.Common;
+using Game.Presentation.Game.Boss.Runtime;
+using Game.Presentation.Game.Boss.UI;
+using Game.Presentation.TestBoss.Data;
 using Game.Presentation.TestBoss;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -434,6 +437,7 @@ namespace Game.Presentation.Game
                 throw new InvalidOperationException("EnemyBulletService is not initialized.");
 
             BossBehaviorUpdateResult updateResult = _bossStateMachine.Update(_battleContext, deltaTime);
+            _battleContext.SetBossActionFrameState(updateResult.FrameState);
             _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, updateResult.SpawnRequests);
             HandleBossBehaviorSignal(updateResult.Signal);
         }

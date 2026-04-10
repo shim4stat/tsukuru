@@ -5,60 +5,80 @@
 * 要件定義書：ボス戦、複数HPゲージ、ダッシュ吸収、ボス接触ダメージ、ドロップ、攻撃アイコン
 * アーキテクチャ設計書：Domain/Presentation 分離、SpawnRequest、コリジョン橋渡し、ObjectPool
 * ドメインモデル設計書：`Boss` / `BattleFlowService` / `BossStateMachine` / `EnemyBullet`
-* データ設計書：`BossParamsContract` / `BossStateDefinition` / `BossAttackDefinition`
+* データ設計書：`BossParamsContract` / `BossStateDefinition` / `BossActionDefinition`
 * 実装計画書：BOSS-01〜13、PL-04、PL-05
 
-本書は上記と矛盾しない形で、**現行のボス行動状態機械** と **弾幕実装の詳細方針** を定める。
-将来拡張案は残すが、現行実装の真実は `BossStateMachine` を中心とした構成とする。
+本書は、今後の正規設計を `BossActionDefinition + Timeline(Command/Window)` 基準で定義し、2026-04-10 時点の実装状況との差分も明記する。
+以後の実装は本書の「正規設計」を優先し、現状コードが未達の箇所は「未実装」または「部分実装」として扱う。
 
 ---
 
 ## 1. 目的
 
 * ボス固有の進行を、バトル全体進行から分離して安全に拡張できるようにする。
-* フェーズ制御、攻撃選択、弾の撃ち方を責務分離し、複雑化しても破綻しにくい構造にする。
-* 複数HPゲージ、イントロ演出、撃破演出、ダッシュ吸収、ボス接触ダメージ、ドロップと自然に接続できるようにする。
-* 低レベル弾幕は既存 `SingleShot` / `NWayShot` / `BurstShot` を再利用しつつ、将来的な詳細弾幕へ移行可能にする。
+* ボスの下位実行部を弾幕専用実行器ではなく、フレーム基準の汎用行動タイムライン実行器へ置き換える。
+* 「8f で弾を撃つ」「8f〜12f だけ斬撃判定を出す」を同じ仕組みで表現できるようにする。
+* 低レベル弾幕は `SingleShot` / `NWayShot` / `BurstShot` を再利用しつつ、将来的な近接、突進、召喚、SE/VFX、部位連動へ拡張可能な構造にする。
+* 複数HPゲージ、イントロ演出、撃破演出、ダッシュ吸収、ボス接触ダメージ、ドロップ、特殊攻撃による弾消しと自然に接続できるようにする。
 
 ---
 
 ## 2. 位置付けと整合方針
 
-### 2.1 現行実装との関係
+### 2.1 正規設計の立場
 
-* `BattleFlowService` は引き続きバトル全体の外周進行を担う。`BattleStart`、`BossBoot`、`Combat`、`BossDefeated`、`BattleEnd` の真実はここに置く。
-* `Boss` は引き続き Domain 上の真実の状態とし、現在ゲージ、現在HP、撃破判定の責務を持つ。
-* `BossStateMachine` はボス固有進行の中心とし、`Intro`、`Phase`、`Dead` の状態遷移を管理する。
-* `BossAttackController` はフェーズ内の攻撃選択と攻撃進行を担う。各フェーズの固定シーケンスを消化した後、履歴を考慮したランダム選択へ移る。
-* `IBossAttack` は「1攻撃単位」の共通契約であり、現行では `ConfiguredBossAttack` が `BossAttackDefinition` から構築される。
-* `IBossAttackPattern` は低レベルな「弾の撃ち方」の共通契約として残す。`SingleShotPattern`、`NWayShotPattern`、`BurstShotPattern` はこの層に属する。
-* `EnemyBulletSpawnRequest` は引き続き Domain から Presentation への弾生成要求 DTO として用いる。
-* `EnemyBullet` は現行の実行時弾状態として有効なままとし、`EnemyBulletService` が生成、更新、寿命切れ管理を担う。
-* ボス定義の正規入力は `BossParamsContract.InitialStateId`、`States`、`Attacks` とする。
-* 旧 `PhasePatterns` は互換入力としてのみ残し、`MasterDataMapper` が legacy state/attack へ自動変換する。
+* `BattleFlowService` はバトル全体の外周進行を担う。
+  * `BattleStart`、`BossBoot`、`Combat`、`BossDefeated`、`BattleEnd` の真実はここに置く。
+* `Boss` は Domain 上の真実の状態とし、現在ゲージ、現在HP、撃破判定、ゲージ跨ぎダメージ適用を持つ。
+* `BossStateMachine` はボス固有進行の中心とし、`Intro`、`Phase`、`Dead` の遷移を管理する。
+* `Phase` 状態の下位実行は `BossActionController` が担い、1 つずつ `BossActionDefinition` を選択・開始・更新・終了する。
+* 各 `BossActionDefinition` は `ConfiguredBossAction` により実行時オブジェクト化され、その内部で `BossActionTimelineExecutor` がフレーム基準の timeline を進める。
+* timeline は `Command` と `Window` を処理する。
+  * `Command` は瞬間イベント。
+  * `Window` は区間イベント。
+* `SpawnBulletPattern` は timeline command の 1 種であり、弾幕そのものは下位の `IBossAttackPattern` が担当する。
+* `IBossAttackPattern` は低レベルな「弾の撃ち方」の共通契約であり、上位の攻撃単位契約ではない。
+* `EnemyBulletSpawnRequest` は引き続き Domain から Presentation への弾生成要求 DTO として使う。
+* `EnemyBulletService` は引き続き弾の生成、移動、寿命管理、消滅管理を担う。
+* ボス定義の正規入力は `BossParamsContract.InitialStateId`、`States`、`Actions` とする。
+* 旧 `PhasePatterns` は互換入力としてのみ残し、`MasterDataMapper` が legacy action/state へ変換する。
 
-### 2.2 追加用語の扱い
+### 2.2 本書の読み方
 
-| 本書の用語 | 位置付け | 現行実装との接続 |
+* 「正規設計」
+  * 今後の実装が従うべき構造と意味。
+* 「現状実装」
+  * 2026-04-10 時点でコード上に確認できる範囲。
+* 「未実装」
+  * 契約のみ存在する、または契約自体も未整備だが本書上は今後必要とする内容。
+
+正規設計と現状実装が異なる場合、本書では正規設計を本文の基準とし、差分は `8. 実装状況と未実装項目` で明示する。
+
+### 2.3 用語
+
+| 用語 | 役割 | 補足 |
 | --- | --- | --- |
-| `BossRoot` | Unity 上のボス親 Prefab | Domain の `Boss` を可視化する Presentation ルート |
-| `BossStateMachine` | ボス固有状態機械 | `Intro` / `Phase` / `Dead` の進行と遷移を管理 |
+| `BossStateMachine` | ボス固有状態機械 | `Intro` / `Phase` / `Dead` を管理する |
 | `IBossState` | 状態機械の状態契約 | `IntroBossState` / `PhaseBossState` / `DeadBossState` の共通契約 |
-| `BossAttackController` | フェーズ内攻撃オーケストレータ | `IBossAttack` の選択、開始、更新、終了を管理 |
-| `IBossAttack` | 1攻撃単位の契約 | `ConfiguredBossAttack` が `BossAttackDefinition` を実行に変換 |
-| `IBossAttackPattern` | 低レベル弾幕パターン契約 | `SingleShot` / `NWayShot` / `BurstShot` の共通契約 |
-| `BossBehaviorUpdateResult` | ボス更新結果 DTO | 弾生成要求と `IntroCompleted` / `DeadCompleted` を返す |
-| `BossStateDefinition` | 状態定義データ | `StateType`、`AttackPlan`、`Transitions` を持つ |
-| `BossAttackDefinition` | 攻撃定義データ | パターン種別、弾設定、`ActiveDurationSeconds` を持つ |
-| `BossAttackPlan` | フェーズ内攻撃選択定義 | 固定シーケンス、ランダム候補、履歴除外幅を持つ |
-| `BossStateTransition` | 状態遷移定義 | 遷移条件と遷移先状態を持つ |
-| `BossBrain` | Unity 側の将来拡張候補 | 見た目演出や移動の橋渡し候補であり、現行の真実の状態機械ではない |
+| `BossActionController` | フェーズ内 action オーケストレータ | `BossActionPlan` に従って次 action を選ぶ |
+| `IBossAction` | 1 action 単位の共通契約 | `ConfiguredBossAction` が主実装 |
+| `ConfiguredBossAction` | `BossActionDefinition` の実行体 | timeline と完了判定を持つ |
+| `BossActionTimelineExecutor` | action の timeline 実行器 | command 発火、window 集計、子 emitter 更新を行う |
+| `BossActionCommand` | 1 フレームで発火するイベント | `PlayAnimation` / `SpawnBulletPattern` / `EmitSignal` など |
+| `BossActionWindow` | 一定区間だけ有効な状態 | `HitboxWindow` / `InvincibleWindow` など |
+| `BossBulletPatternDefinition` | 低レベル弾幕 emitter の設定 | 発射周期、Way 数、弾速などを持つ |
+| `BossBulletPatternEmitterRuntime` | 継続発火する弾幕 emitter 実行体 | timeline command から起動される |
+| `IBossAttackPattern` | 下位弾幕パターン契約 | `SingleShot` / `NWayShot` / `BurstShot` の共通契約 |
+| `BossActionExecutionResult` | action 1 update 分の内部結果 | `SpawnRequests` / `EmittedSignals` / `ActiveWindows` を持つ |
+| `BossBehaviorUpdateResult` | ボス更新結果 DTO | いまは `SpawnRequests` と `BossBehaviorSignal` を返す |
+| `BossBrain` | 将来の Presentation/Animation 連携候補 | 現行の真実の状態機械ではない |
 
-### 2.3 要件解釈の固定
+### 2.4 要件解釈の固定
 
-* ボスは要件通り、基本的にロボット外かつ画面右側に存在する前提で設計する。
-* 攻撃アイコンは既存要件の「通常4 + 特殊1」を前提とし、四隅や右中央などの具体的な配置は Stage/Robot レイアウト側の責務とする。
-* 本書でいう「右中央の大砲」は、既存要件の**特殊攻撃アイコンから発動される強攻撃シーケンスの一形態**として扱う。別ルールの独立システムにはしない。
+* ボスは基本的にロボット外かつ画面右側に存在する前提で設計する。
+* 攻撃アイコンは既存要件の「通常4 + 特殊1」を前提とし、四隅や右中央などの具体配置は Stage/Robot レイアウト側の責務とする。
+* 本書でいう「右中央の大砲」は、既存要件の特殊攻撃アイコンから発動される強攻撃シーケンスの一形態として扱う。
+* 近接、体当たり、突進、召喚、SE/VFX も timeline command / window に乗せる対象とする。弾幕だけを特別扱いしない。
 
 ---
 
@@ -70,59 +90,69 @@
   * 現在ゲージ、現在HP、撃破判定、ゲージ跨ぎダメージ適用を保持する。
 * `BattleFlowService`
   * バトル全体のフェーズ進行を管理する。
-  * `BossBoot` 完了と撃破完了の受け口を持つが、ボス固有の内部状態遷移は持たない。
+  * ボス固有の内部状態遷移は持たない。
 * `BossStateMachine`
   * ボス固有の `Intro`、`Phase`、`Dead` を管理する。
-  * 状態更新結果として `EnemyBulletSpawnRequest` 群と `BossBehaviorSignal` を返す。
-* `BossAttackController`
-  * フェーズ内の攻撃選択と攻撃進行を担う。
-  * `OpeningSequenceAttackIds` を先に消化し、その後 `RandomAttackIds` から履歴除外付きで攻撃を選ぶ。
-* `ConfiguredBossAttack`
-  * `BossAttackDefinition` を 1 攻撃単位の実行オブジェクトへ変換する。
-  * `ActiveDurationSeconds` の範囲で低レベルパターンを更新し、完了判定を持つ。
+  * state 定義と action 定義の妥当性検証を担う。
+  * `Phase` では `BossActionController` を用いて action を進行させる。
+* `BossActionController`
+  * `OpeningSequenceActionIds` を先に消化し、その後 `RandomActionIds` から履歴除外付きで次 action を選ぶ。
+  * action 完了の検知と履歴更新を担う。
+* `ConfiguredBossAction`
+  * 1 つの `BossActionDefinition` を実行する。
+  * `deltaTime` を 60fps 仮想 frame に変換し、timeline を進める。
+  * `Manual` / `DurationElapsed` の終了条件を扱う。
+* `BossActionTimelineExecutor`
+  * command 発火、active window 集計、弾幕 emitter 更新、signal 収集を担う。
+* `BossBulletPatternEmitterRuntime`
+  * `SpawnBulletPattern` command で起動され、下位 `IBossAttackPattern` を継続更新する。
 * `BossAttackPatternFactory`
-  * `BossAttackDefinition` から `IBossAttackPattern` を構築する。
-  * パターン種別ごとの最小妥当性検証を担う。
+  * `BossBulletPatternDefinition` から `IBossAttackPattern` を生成する。
+  * 下位弾幕定義の妥当性検証を担う。
+* `IBossAttackPattern`
+  * 低レベルな弾の撃ち方のみを表す。
+  * 状態遷移、近接判定、SE/VFX、部位制御は持たない。
 * `EnemyBulletService`
   * 弾の生成、移動、寿命管理、消滅管理を担う。
 * `BossDamageService`
   * ボスへのダメージ適用のみを担う。
-  * バトル進行通知は行わず、撃破遷移は `BossStateMachine` 側が HP 状態を見て判断する。
 * `DropService` / `ItemSpawnService`
   * ダッシュ吸収、被弾時ドロップ、撃破ドロップ、個数上限を担う。
 
 ### 3.2 Presentation
 
-* `BossRoot`、`BossHealth`、`BossAssembler`、`BossAnimatorBridge`
-  * Prefab 構造、見た目、アニメ同期、位置反映、被弾入口の橋渡しを担う。
 * `GameSceneEntryPoint`
   * `BattleFlowService` と `BossStateMachine` を接続する。
   * `BossBoot` と `Combat` の両方で `BossStateMachine.Update` を呼び、戻り値の `SpawnRequests` と `BossBehaviorSignal` を処理する。
 * `BossTitleOverlayPresenter`
   * イントロ演出完了時に `BossStateSignalIds.IntroFinished` を `BossStateMachine` へ通知する。
 * `BossBattleRuntime`
-  * `EnemyBullet` と View の同期、当たり判定橋渡し、ボス View の反映を担う。
-* `BossSpawnPoint`、`BossSpawner`
-  * ステージ上の出現位置、登場演出位置、フェーズ遷移時の再配置位置を定義する将来拡張ポイントとする。
+  * `EnemyBullet` と View の同期、ボス View の反映、当たり判定橋渡しを担う。
+* `BossRoot`、`BossHealth`、`BossAssembler`、`BossAnimatorBridge`
+  * Prefab 構造、見た目、アニメ同期、位置反映、被弾入口の橋渡しを担う将来拡張ポイント。
 * `BossHurtbox`、`BossAttackHitbox`、`BulletHitbox`
   * Unity の Trigger/Collision を受け、Domain サービスへ橋渡しする。
 
 ### 3.3 MasterData / ScriptableObject
 
 * `BossParamsContract`
-  * 複数ゲージ HP、ドロップ量、初期状態 ID、状態定義、攻撃定義を持つ。
+  * 複数ゲージ HP、ドロップ量、初期状態 ID、状態定義、action 定義を持つ。
 * `BossStateDefinition`
-  * 状態 ID、`StateType`、`AttackPlan`、`Transitions` を持つ。
-* `BossAttackDefinition`
-  * `PatternType`、発射パラメータ、弾パラメータ、`ActiveDurationSeconds` を持つ。
-* `BossAttackPlan`
-  * `OpeningSequenceAttackIds`、`RandomAttackIds`、`HistoryWindow` を持つ。
-* `BossStateTransition`
-  * `ConditionType`、`Threshold`、`SignalId`、`NextStateId` を持つ。
+  * 状態 ID、`StateType`、`ActionPlan`、`Transitions` を持つ。
+* `BossActionPlan`
+  * `OpeningSequenceActionIds`、`RandomActionIds`、`HistoryWindow` を持つ。
+* `BossActionDefinition`
+  * `AnimationStateName`、`EndConditionType`、`TotalDurationFrames`、`Commands`、`Windows` を持つ。
+* `BossActionCommand`
+  * `TriggerFrame`、`CommandType` と command ごとの payload を持つ。
+* `BossActionWindow`
+  * `Id`、`WindowType`、`StartFrameInclusive`、`EndFrameExclusive` を持つ。
+* `BossBulletPatternDefinition`
+  * 下位弾幕 emitter の発射設定を持つ。
+* `PhasePatterns`
+  * 互換入力専用。
 * `BossLayout`
-  * 部位 Prefab、差し込みスロット、ローカル座標、初期有効状態を持つ Presentation 向けレイアウト定義とする将来拡張候補。
-* `SpellDefinition`、`EmitterPreset`、`BulletSpec`
-  * 詳細弾幕段階で導入する将来拡張候補とする。
+  * 部位 Prefab、差し込みスロット、ローカル座標、初期有効状態を持つ Presentation 向けレイアウト定義の将来拡張候補。
 
 ---
 
@@ -158,6 +188,7 @@ BossRoot
 
 * 被弾判定群を管理する。
 * `CoreHurtbox`、`WeakPointHurtbox`、`PartHurtbox` を必要に応じてぶら下げる。
+* 将来的には `HurtboxWindow` により有効・無効を切り替える。
 
 #### `BodyCollision`
 
@@ -189,7 +220,7 @@ BossRoot
 * ボスの初期位置は Prefab に固定しない。
 * `BossSpawnPoint` は少なくとも `introAnchor` と `battleAnchor` を持つ想定とする。
 * 必要に応じて `phaseTransitionAnchor` を持ち、フェーズ遷移演出時の再配置先に使う。
-* `BossSpawner` は Stage 開始やイベント開始時に、出現位置、向き、`BossLayout`、使用ボス定義をまとめて割り当てる将来拡張ポイントとする。
+* `BossSpawner` は Stage 開始やイベント開始時に、出現位置、向き、`BossLayout`、使用ボス定義をまとめて割り当てる。
 
 ### 4.5 判定分離
 
@@ -197,11 +228,12 @@ BossRoot
 * `BossHurtbox` は被弾判定のみ。
 * `BossAttackHitbox` は近接攻撃や体当たり攻撃の当たり判定のみ。
 * `BodyCollision` は通常接触用。
-* `BossAttackHitbox` は常時有効にせず、Animation Event または攻撃シーケンスから明示制御する。
+* `BossAttackHitbox` は常時有効にせず、将来的には `HitboxWindow` で明示制御する。
+* `InvincibleWindow` はボス被弾入口側で吸収し、見た目だけでは無敵判定を決めない。
 
 ### 4.6 高レベル状態
 
-現行のボス固有状態は Domain 側の `BossStateMachine` で次を管理する。
+ボス固有状態は Domain 側の `BossStateMachine` で次を管理する。
 
 * `Intro`
 * `Phase`
@@ -210,57 +242,37 @@ BossRoot
 補足：
 
 * これはボス行動の真実の状態であり、`BattleFlowService` の外周フェーズと分離する。
-* `BossBrain` 側で `Idle`、`Move`、`Recovery`、`Stunned` などを持つ構成は将来拡張案とし、現行実装の前提にはしない。
-* フェーズごとの差分はクラス増殖ではなく `BossStateDefinition` と `BossAttackPlan` のデータ差分で表現する。
+* `BossBrain` 側で `Idle`、`Move`、`Recovery`、`Stunned` などを持つ構成は将来拡張案であり、現行の真実の状態機械ではない。
+* フェーズごとの差分はクラス増殖ではなく `BossStateDefinition` と `BossActionPlan` のデータ差分で表現する。
 
 ---
 
-## 5. 弾幕システム層設計
+## 5. Action / Timeline 実行設計
 
 ### 5.1 基本モデル
 
-現行の弾幕制御は次の階層で分離する。
+ボスの下位実行は次の階層で分離する。
 
 * `BattleFlowService`
 * `BossStateMachine`
 * `IBossState`
-* `BossAttackController`
-* `IBossAttack`
+* `BossActionController`
+* `IBossAction`
+* `BossActionTimelineExecutor`
+* `BossBulletPatternEmitterRuntime`
 * `IBossAttackPattern`
 * `EnemyBulletSpawnRequest`
 * `EnemyBulletService`
 
-ボス本体は「どの状態にいるか」「今どの攻撃を実行するか」を決め、低レベル弾幕層は「どの方向にどう撃つか」を担う。
+ボス本体は「どの状態にいるか」「今どの action を実行するか」を決め、timeline 層は「どの frame で何を起こすか」を決め、低レベル弾幕層は「どういう弾をどう撃つか」を担う。
 
-### 5.2 現行実装の構成
-
-* `BossStateMachine`
-  * `Intro`、`Phase`、`Dead` の遷移を管理する。
-  * 各フレームの更新結果として `BossBehaviorUpdateResult` を返す。
-* `BossBehaviorUpdateResult`
-  * `SpawnRequests` と `BossBehaviorSignal` を持つ。
-  * `BossBehaviorSignal` は `None`、`IntroCompleted`、`DeadCompleted` を持つ。
-* `PhaseBossState`
-  * `BossAttackController` を 1 つ保持し、フェーズ中の攻撃進行を集約する。
-* `BossAttackController`
-  * フェーズ開始時に攻撃履歴と現在攻撃を初期化する。
-  * 固定シーケンスを先に消化し、その後ランダム候補から攻撃を選ぶ。
-  * `HistoryWindow` 分だけ直近攻撃を除外し、候補が不足した場合は除外幅を 1 ずつ緩める。
-* `ConfiguredBossAttack`
-  * `BossAttackDefinition` から `IBossAttackPattern` を生成し、`ActiveDurationSeconds` の範囲で更新する。
-  * 期間終了時に `IsCompleted` を立て、`BossAttackController` に完了を通知する。
-* `BossAttackPatternFactory`
-  * 低レベル弾幕 `SingleShot` / `NWayShot` / `BurstShot` を生成する。
-* `EnemyBulletService`
-  * `SpawnRequests` を `EnemyBullet` 実体へ変換し、移動・寿命更新を行う。
-
-### 5.3 状態定義と遷移条件
+### 5.2 状態定義と遷移条件
 
 `BossStateDefinition` は次を持つ。
 
 * `Id`
 * `StateType`
-* `AttackPlan`
+* `ActionPlan`
 * `Transitions`
 
 `BossStateType` は次の 3 種とする。
@@ -269,7 +281,7 @@ BossRoot
 * `Phase`
 * `Dead`
 
-`BossStateTransition` の `ConditionType` は次を持つ。
+`BossStateTransition.ConditionType` は次を持つ。
 
 * `ExternalSignal`
 * `ElapsedTime`
@@ -280,23 +292,196 @@ BossRoot
 運用方針：
 
 * 正規用途は `ExternalSignal`、`ElapsedTime`、`CurrentHpRateAtOrBelow`、`CurrentAttackCompleted` とする。
-* `CurrentGaugeIndexAtOrAbove` は旧 `PhasePatterns` からの互換変換用条件として主に用いる。
+* `CurrentGaugeIndexAtOrAbove` は legacy `PhasePatterns` からの互換変換用条件として主に用いる。
+* `CurrentAttackCompleted` は enum 名だけ旧名が残っているが、意味は「現在 action が完了した」で扱う。
 * 遷移は宣言順に評価し、同フレームで複数条件が成立しても先頭のみ採用する。
 * 終端遷移は `Dead` からのみ許可する。
 * `Intro` 完了は Presentation から渡される外部シグナルで決定する。
 * HP 0 到達後も即座に `BattleFlowService` を終端させず、`Dead` 状態の完了後に `DeadCompleted` を返して撃破進行へ入る。
 
-### 5.4 攻撃定義と攻撃選択
+### 5.3 Action 定義と選択
 
-`BossAttackDefinition` は次を持つ。
+`BossActionDefinition` は次を持つ。
 
 * `Id`
+* `AnimationStateName`
+* `EndConditionType`
+* `TotalDurationFrames`
+* `Commands`
+* `Windows`
+
+`BossActionEndConditionType` は次を持つ。
+
+* `Manual`
+* `DurationElapsed`
+
+`BossActionPlan` は次を持つ。
+
+* `OpeningSequenceActionIds`
+* `RandomActionIds`
+* `HistoryWindow`
+
+運用方針：
+
+* 各フェーズはまず `OpeningSequenceActionIds` を順番に消化する。
+* その後は `RandomActionIds` からランダム選択する。
+* `RandomActionIds` が空なら `OpeningSequenceActionIds` をランダム候補として再利用できる。
+* `HistoryWindow` で指定した直近履歴を除外する。
+* 除外により候補がなくなった場合は、除外幅を 1 ずつ緩めて最終的に選択可能な候補を作る。
+* `AnimationStateName` は action 開始時の基本アニメ状態を表す予約フィールドとし、将来的に `BossAnimatorBridge` が参照する。
+* `Manual` action は自動完了しない。
+  * state 遷移または外部条件で action ごと終了させる。
+* `DurationElapsed` action は `TotalDurationFrames` 到達で自動完了する。
+* `DurationElapsed` action が 1 update 中に終了した場合、余剰 frame は次 action に持ち越して同じ update 内で処理できる構造を正とする。
+
+### 5.4 Command 設計
+
+すべての command は少なくとも次を持つ。
+
+* `TriggerFrame`
+* `CommandType`
+
+`BossActionCommandType` は次を持つ。
+
+* `PlayAnimation`
+* `SpawnBulletPattern`
+* `SpawnEnemy`
+* `PlayEffect`
+* `PlaySound`
+* `EmitSignal`
+
+#### `PlayAnimation`
+
+* 指定 frame でアニメ状態を切り替える。
+* 最低限の payload は `AnimationStateName`。
+* 将来的には layer、blend、cross-fade 秒数、上書きモードを追加できる。
+* 現状実装では enum と文字列フィールドのみ存在し、runtime 実装は未接続。
+
+#### `SpawnBulletPattern`
+
+* 指定 frame で低レベル弾幕 emitter を起動する。
+* payload は `BossBulletPatternDefinition` と `EmitterDurationFrames`。
+* `EmitterDurationFrames = null` は「action 終了まで継続」を意味する。
+* この command 自体は「弾幕 emitter を開始する」ものであり、低レベルパターンは emitter 側が継続更新する。
+* 正規設計としては、command 発火 frame と同じ frame に即発射できる設定を持てるべきである。
+  * 例：`FireOnStart` または同等の初期遅延設定。
+  * 現状実装ではこの表現力は未実装で、`FireIntervalFrames` 経過後に初弾が出る。
+
+#### `SpawnEnemy`
+
+* 指定 frame で使い魔、砲台、子機、補助ユニットを生成する。
+* 将来的な payload 例：
+  * `EnemyDefinitionId`
+  * `SpawnAnchorId`
+  * `SpawnOffset`
+  * `InitialSignalId`
+* 現状実装では未対応 command として初期化時に弾く。
+
+#### `PlayEffect`
+
+* 指定 frame で VFX を再生する。
+* 将来的な payload 例：
+  * `EffectId`
+  * `AttachTarget`
+  * `LocalOffset`
+  * `LifetimePolicy`
+* 現状実装では未対応 command として初期化時に弾く。
+
+#### `PlaySound`
+
+* 指定 frame で SE を再生する。
+* 将来的な payload 例：
+  * `SoundId`
+  * `MixerRoute`
+  * `VolumeScale`
+* 現状実装では未対応 command として初期化時に弾く。
+
+#### `EmitSignal`
+
+* 指定 frame で action 内部シグナルを発火する。
+* シグナルは同 update 内で state 遷移判定へマージされる。
+* これにより「action の特定 frame 到達で phase を切り替える」を表現できる。
+
+#### 共通ルール
+
+* 同一 frame に複数 command がある場合、定義順に実行できることを正とする。
+* 未対応 command は沈黙して無視せず、初期化時 validation で失敗させる。
+
+### 5.5 Window 設計
+
+すべての window は少なくとも次を持つ。
+
+* `Id`
+* `WindowType`
+* `StartFrameInclusive`
+* `EndFrameExclusive`
+
+`BossActionWindowType` は次を持つ。
+
+* `MoveWindow`
+* `HitboxWindow`
+* `HurtboxWindow`
+* `InvincibleWindow`
+* `CancelWindow`
+
+#### `MoveWindow`
+
+* 特定区間だけ移動制御を有効化する。
+* 将来的な payload 例：
+  * `MovePresetId`
+  * `Velocity`
+  * `CurveId`
+  * `TargetAnchorId`
+* 突進、回り込み、後退、ふわり移動などをこの window で表現する。
+
+#### `HitboxWindow`
+
+* 特定区間だけ近接攻撃判定や体当たり判定を有効化する。
+* 将来的な payload 例：
+  * `HitboxGroupId`
+  * `DamageProfileId`
+  * `KnockbackPresetId`
+
+#### `HurtboxWindow`
+
+* 特定区間だけ被弾部位を有効化する。
+* 将来的な payload 例：
+  * `HurtboxGroupId`
+  * `ExposedPartId`
+
+#### `InvincibleWindow`
+
+* 特定区間だけボス被弾を無効化する。
+* 将来的な payload 例：
+  * `DamageMask`
+  * `IgnoreSourceTag`
+
+#### `CancelWindow`
+
+* 特定区間だけ action の割り込みを許可する。
+* 将来的な payload 例：
+  * `CancelTag`
+  * `PriorityThreshold`
+  * `NextActionCategory`
+
+#### 共通ルール
+
+* `StartFrameInclusive` は開始 frame を含む。
+* `EndFrameExclusive` は終了 frame を含まない。
+* 同時に複数 window が重なってもよい。
+* `Window` は「状態」なので、1 度発火して終わる command と混同しない。
+* 現状 contract は type と区間しか持っていないため、window ごとの詳細 payload は未実装である。
+
+### 5.6 BulletPattern 定義
+
+`BossBulletPatternDefinition` は次を持つ。
+
 * `PatternType`
-* `FireIntervalSeconds`
+* `FireIntervalFrames`
 * `ShotCount`
 * `SpreadDegrees`
 * `BurstShotCount`
-* `BurstShotIntervalSeconds`
+* `BurstShotIntervalFrames`
 * `BulletSpeed`
 * `BulletLifetimeSeconds`
 * `BulletDamage`
@@ -304,25 +489,14 @@ BossRoot
 * `BulletBehaviorType`
 * `SpawnOffset`
 * `FireDirection`
-* `ActiveDurationSeconds`
 
-`BossAttackPlan` は次を持つ。
+`BossAttackPatternType` は次を持つ。
 
-* `OpeningSequenceAttackIds`
-* `RandomAttackIds`
-* `HistoryWindow`
+* `SingleShot`
+* `NWayShot`
+* `BurstShot`
 
-運用方針：
-
-* 各フェーズはまず `OpeningSequenceAttackIds` を順番に消化する。
-* その後は `RandomAttackIds` からランダム選択する。
-* `RandomAttackIds` が空なら `OpeningSequenceAttackIds` をランダム候補として再利用できる。
-* `HistoryWindow` で指定した直近履歴を除外する。
-* 除外により候補がなくなった場合は、直近除外幅を 1 ずつ緩め、最終的に選択可能な候補を作る。
-
-### 5.5 低レベル弾幕パターン
-
-現行の低レベル弾幕は次の責務分離で構成する。
+低レベル弾幕は次の責務分離で構成する。
 
 * `IBossAttackPattern`
   * `Reset()` と `Update(BattleContext, deltaTime)` を共通契約とする。
@@ -339,52 +513,129 @@ BossRoot
 
 補足：
 
-* 現行実装では **1 パターン = 1 クラス = 1 ファイル** を基本方針とする。
-* `EnemyBulletBehaviorType` は設定上は複数種を許容するが、現行運用は主に `Straight` を前提とする。
-* 低レベルパターンは「どの弾をどう撃つか」だけを担い、状態遷移や攻撃選択は持たない。
+* timeline は frame 基準、低レベル弾幕の update は `deltaTime` 秒基準という 2 層構造を取る。
+* `BulletLifetimeSeconds` は現状どおり秒基準で管理する。
+* `EnemyBulletBehaviorType` は設定上 `Straight` / `Wave` / `Homing` を許容するが、現状運用は実質 `Straight` が中心である。
+* 将来的に詳細弾幕へ進む場合も、弾 1 発ごとに複雑性を持たせず、timeline と emitter の合成で表現する。
 
-### 5.6 互換入力
+### 5.7 1 update 内の実行順
 
-旧 `BossParamsContract.PhasePatterns` は正規入力ではないが、互換入力として維持する。
+`ConfiguredBossAction.Update` は次の順序で動くことを正とする。
 
-* `MasterDataMapper` は `PhasePatterns` しか存在しない場合、legacy attack 群と legacy state 群を自動生成する。
-* legacy state は `legacy_intro`、`legacy_phase_i`、`legacy_dead` を基本形とする。
-* legacy phase の遷移には `CurrentGaugeIndexAtOrAbove` を使い、旧「ゲージ番号と攻撃番号が直結する」構造を再現する。
-* 互換変換後の攻撃は `ActiveDurationSeconds = Infinity` とし、旧パターン挙動を維持する。
+1. `deltaTime` を 60fps 仮想 frame に変換し、蓄積する。
+2. 跨いだ frame 数だけ loop する。
+3. 現在 frame に到達した command を発火する。
+4. 起動済み bullet emitter を 1 frame 分更新する。
+5. その frame で発生した `EnemyBulletSpawnRequest` と `EmittedSignals` を収集する。
+6. frame を進める。
+7. 最新処理 frame に対する `ActiveWindows` を返す。
 
-### 5.7 現行最小構成の例
+補足：
+
+* `SpawnBulletPattern` は command 発火と同 frame に emitter が更新される。
+* ただし emitter 内部パターンは `FireIntervalFrames` を持つため、初弾が発火 frame と同じになるかどうかは別途 `FireOnStart` 等の設計に依存する。
+* `DurationElapsed` action が途中で終わった場合の余剰 frame は、正規設計では次 action に持ち越す。
+* 現状実装では余剰 frame の持ち越しが未完了であり、大きい `deltaTime` で action 終了を跨ぐと実時間より遅れる。
+
+### 5.8 現行最小構成の例
 
 `stage_01` のテストボスは次の構成を取る。
 
 * `intro`
   * `ExternalSignal(intro_finished)` を待つ。
 * `phase_01`
-  * `phase_01_single` を固定攻撃として繰り返す。
-  * 攻撃内容は「1 秒ごとに真下へ単発弾を 1 発」。
-  * `CurrentHpRateAtOrBelow = 0` で `dead` へ遷移する。
+  * `phase_01_single` を固定 action として繰り返す。
+* `phase_01_single`
+  * `TriggerFrame = 0` に `SpawnBulletPattern` を 1 回発火する。
+  * その emitter は `FireIntervalFrames = 60` で真下へ単発弾を継続発射する。
+  * `EndConditionType = Manual` のため、自動完了しない。
 * `dead`
   * `ElapsedTime = 0.5` 秒後に終端完了する。
 
 この構成により、ボスタイトル演出中は攻撃せず、演出完了後に戦闘へ入り、HP 0 到達後は短い撃破完了待ちを経てバトル終端へ進む。
 
-### 5.8 将来拡張
+---
 
-* `SpellDefinition`
-  * スペル名、ループ位置、終了条件、タイムラインコマンド列、難易度差分を持つ詳細弾幕定義。
-* `PatternRunner`
-  * 詳細弾幕段階で「何秒目に何をするか」を順番に実行するタイムライン進行器。
-* `EmitterController`
-  * 発射位置、基準角、発射方式、Way 数、回転量、自機狙い補正などを持つ発射器制御。
-* `FamiliarController`
-  * 移動しながら弾幕を撃つ補助ノード。
+## 6. データ設計と互換方針
 
-将来の詳細弾幕では、複雑さを個々の弾に持たせず、時間制御と発射規則の合成で表現する。
+### 6.1 正規データ
+
+`BossParamsContract` は次を持つ。
+
+* `Id`
+* `GaugeMaxHps`
+* `BaseDropEnergyAmount`
+* `MinDropIntervalSeconds`
+* `ActionIntervalSeconds`
+* `InitialStateId`
+* `States`
+* `Actions`
+* `PhasePatterns`
+
+補足：
+
+* `Actions` が正規入力であり、`PhasePatterns` は互換入力。
+* `ActionIntervalSeconds` は legacy 互換や高レベル調整で残るが、正規 action timeline の実行単位は frame である。
+
+### 6.2 ScriptableObject 側
+
+ScriptableObject は次を持つ。
+
+* `BossActionDefinitionAsset`
+* `BossActionPlanAsset`
+* `BossActionCommandAsset`
+* `BossActionWindowAsset`
+* `BossBulletPatternDefinitionAsset`
+
+移行方針：
+
+* `BossStateDefinitionAsset.attackPlan` は `actionPlan` へ rename し、旧 field 名は `FormerlySerializedAs` で吸収する。
+* `BossParamsAsset.attacks` は `actions` へ rename し、旧 field 名は `FormerlySerializedAs` で吸収する。
+* ただし、旧 flat `BossAttackDefinitionAsset` の内部構造をそのまま新 `commands/windows` 構造へ自動変換する機能は現状未整備である。
+* 旧 flat `attacks` データを使う資産が残る場合は、将来的に importer または一括 migration を別途用意する。
+
+### 6.3 互換入力
+
+旧 `BossParamsContract.PhasePatterns` は正規入力ではないが、互換入力として維持する。
+
+* `MasterDataMapper` は `States` / `Actions` / `InitialStateId` が不足している場合、legacy action 群と legacy state 群を自動生成する。
+* legacy state は `legacy_intro`、`legacy_phase_i`、`legacy_dead` を基本形とする。
+* legacy phase の遷移には `CurrentGaugeIndexAtOrAbove` を使い、旧「ゲージ番号と攻撃番号が直結する」構造を再現する。
+* 互換変換後の action は `Manual` action として作り、`TriggerFrame = 0` の `SpawnBulletPattern` command で継続 emitter を起動する。
+
+### 6.4 正規データとコードの責務分離
+
+データに寄せるもの：
+
+* `InitialStateId`
+* `BossStateDefinition`
+* `BossActionPlan`
+* `BossActionDefinition`
+* `BossActionCommand`
+* `BossActionWindow`
+* `BossBulletPatternDefinition`
+* 発射間隔、Way 数、拡散角、弾速、寿命、威力、吸収量、挙動種別
+* 各種アニメ名、SE 名、VFX 名、将来の summon 定義
+* 部位レイアウト
+
+コードに寄せるもの：
+
+* 状態遷移の実行
+* action 選択の履歴管理
+* timeline の frame 進行
+* command 発火順制御
+* window 有効判定
+* emit signal と state transition の merge
+* 下位弾幕パターン生成
+* 妥当性検証
+* legacy 互換変換
+* ダメージ適用、ドロップ、一括弾消し
 
 ---
 
-## 6. ゲーム固有要素との接続
+## 7. ゲーム固有要素との接続
 
-### 6.1 ダッシュ吸収
+### 7.1 ダッシュ吸収
 
 敵弾は少なくとも次の値を持つ。
 
@@ -398,12 +649,13 @@ BossRoot
 * `ItemSpawnService` または対応する加算処理へ吸収量を通知する。
 * 弾 View は Pool または破棄経路へ返却する。
 
-### 6.2 ボス接触ダメージ
+### 7.2 ボス接触ダメージ
 
 * ダッシュ中のプレイヤーが `BodyCollision` に触れた場合、Presentation は Domain の `DamageService` へ「Boss 接触ダメージ」を通知する。
 * 近接攻撃判定と通常接触判定は分離し、常時有効な攻撃 Hitbox にはしない。
+* 将来的に近接攻撃そのものは `HitboxWindow` と `PlayAnimation` の組み合わせで同期する。
 
-### 6.3 特殊攻撃による弾消し
+### 7.3 特殊攻撃による弾消し
 
 * 特殊攻撃アイコンに紐づく強攻撃シーケンスは、必要に応じて「大ダメージ + 敵弾一括消去」を持てる。
 * 一括消去はボス固有コードから個別弾参照しない。
@@ -414,58 +666,91 @@ BossRoot
 * `ClearEnemyBullets(ClearReason.SpecialAttack)`
 * `ClearEnemyBulletsOwnedBy(bossId, ClearReason.BossPhaseEnd)`
 
-### 6.4 ドロップと高リスク・高リターン
+### 7.4 ドロップと高リスク・高リターン
 
 * ボス本体は画面右側の圧力源として設計する。
 * プレイヤーが右側に踏み込むほど、被弾、接触、高密度弾幕のリスクが高まる。
 * その代わり、ボス被弾時ドロップや撃破ドロップは `DropService` と連携して高いリターンに繋げる。
 * ドロップ量は既存要件どおり、基礎量と攻撃側のドロップ倍率で算出する。
 
----
+### 7.5 Animation / SE / VFX 連携
 
-## 7. データとコードの分担
-
-### 7.1 データに寄せるもの
-
-* `InitialStateId`
-* `BossStateDefinition` の `StateType`
-* `BossStateTransition` の条件種別、しきい値、シグナル ID、遷移先
-* `BossAttackPlan` の固定シーケンス、ランダム候補、履歴除外幅
-* `BossAttackDefinition` の `patternType`
-* 発射間隔
-* Way 数
-* 拡散角
-* バースト数
-* バースト内間隔
-* 発射方向
-* 発射原点オフセット
-* 弾の見た目、寿命、速度、吸収量、挙動種別
-* 攻撃の継続時間
-* 部位レイアウト
-
-### 7.2 コードに寄せるもの
-
-* 状態遷移の実行
-* 攻撃選択の履歴管理
-* `BossAttackPatternFactory` による低レベルパターン生成
-* パターン別の妥当性検証
-* `PhasePatterns` からの互換変換
-* `BossBehaviorSignal` の生成と外周フロー接続
-* 弾の一括更新
-* 吸収処理
-* 一括弾消し
-* フェーズ移行トリガーの評価
-* 将来のタイムライン進行
-
-### 7.3 判断基準
-
-* 数値調整と構成差分はデータで扱う。
-* 実行時状態、履歴、分岐、シグナル連携はコードで扱う。
-* ScriptableObject に実行時状態を持たせない。
+* `AnimationStateName` と `PlayAnimation` は `BossAnimatorBridge` を通じて Unity Animator へ橋渡しする。
+* `PlayEffect` は `VFXRoot` または部位 attach 点へ出す。
+* `PlaySound` は action の frame に同期して SE を鳴らす。
+* 現状は契約のみで、runtime 接続は未実装。
 
 ---
 
-## 8. 段階導入方針
+## 8. 実装状況と未実装項目
+
+### 8.1 現状整理
+
+| 項目 | 正規設計 | 現状 | 備考 |
+| --- | --- | --- | --- |
+| `BossStateMachine` による `Intro` / `Phase` / `Dead` 管理 | 実装する | 実装済み | state 遷移と validation あり |
+| `BossActionPlan` による固定順 + 履歴付きランダム選択 | 実装する | 実装済み | `HistoryWindow` の除外緩和あり |
+| `ConfiguredBossAction` による frame 基準 timeline 実行 | 実装する | 実装済み | 60fps 仮想 frame で更新 |
+| `SpawnBulletPattern` command | 実装する | 実装済み | bullet emitter 起動まで接続済み |
+| `EmitSignal` command | 実装する | 実装済み | 同 update 内で state transition 判定へ反映済み |
+| `Manual` end condition | 実装する | 実装済み | 自動完了しない |
+| `DurationElapsed` end condition | 実装する | 部分実装 | 完了判定はあるが余剰 frame 持ち越しが未完 |
+| `BossBulletPatternDefinition` -> `SingleShot/NWay/BurstShot` | 実装する | 実装済み | 下位弾幕再利用済み |
+| `PhasePatterns` 互換変換 | 実装する | 実装済み | legacy state/action 生成あり |
+| `Action.AnimationStateName` | Animator 連携に使う | 未実装 | field のみ存在 |
+| `PlayAnimation` command | 中途アニメ切替 | 未実装 | validation で reject |
+| `SpawnEnemy` command | 子機/使い魔/砲台生成 | 未実装 | payload も未整備 |
+| `PlayEffect` command | VFX 再生 | 未実装 | payload も未整備 |
+| `PlaySound` command | SE 再生 | 未実装 | payload も未整備 |
+| `BossActionWindow` の active 判定 | 実装する | 部分実装 | action 内部では集計している |
+| `ActiveWindows` の外部公開 | 実装する | 未実装 | `BossBehaviorUpdateResult` がまだ持たない |
+| `MoveWindow` の実戦闘適用 | 実装する | 未実装 | 移動制御橋渡しなし |
+| `HitboxWindow` の実戦闘適用 | 実装する | 未実装 | 近接判定の有効化未接続 |
+| `HurtboxWindow` の実戦闘適用 | 実装する | 未実装 | ボス被弾部位制御なし |
+| `InvincibleWindow` の実戦闘適用 | 実装する | 未実装 | ボス無敵窓未接続 |
+| `CancelWindow` の実戦闘適用 | 実装する | 未実装 | action 割り込み制御なし |
+| 即発射可能な `SpawnBulletPattern` | 実装する | 未実装 | `FireOnStart` 相当がない |
+| 同 frame 複数 command の定義順保証 | 実装する | 部分実装 | 現状 sort では安定順が保証されない |
+| `Wave` / `Homing` の実挙動 | 実装する | 部分実装 | 設定列挙はあるが運用はほぼ `Straight` |
+| 旧 flat `attacks` asset の自動移行 | 実装する | 未実装 | field rename のみで内部形状変換なし |
+| `BossActionService` | 主経路では使わない | 旧実装が残存 | 正規設計では非推奨 |
+
+### 8.2 直近で必要な未実装
+
+#### Window の外部公開と戦闘適用
+
+次段階で最低限必要なこと：
+
+* `BossBehaviorUpdateResult` へ `ActiveWindows` を追加する、または同等の外部公開手段を持つ。
+* `BossBattleRuntime` または同等層が `HitboxWindow` / `InvincibleWindow` / `HurtboxWindow` を参照できるようにする。
+* `MoveWindow` を consume する移動制御層を用意する。
+
+#### Animation / SE / VFX / SpawnEnemy
+
+次段階で最低限必要なこと：
+
+* `PlayAnimation` と `AnimationStateName` を `BossAnimatorBridge` に接続する。
+* `PlayEffect` と `PlaySound` の payload を contract に追加し、Presentation 側の再生口を作る。
+* `SpawnEnemy` の payload と spawn 先責務を定義する。
+
+#### Action 時間進行の完成
+
+次段階で最低限必要なこと：
+
+* `DurationElapsed` action 終了時の余剰 frame を次 action へ持ち越す。
+* 同 frame 複数 command の実行順を authoring 順で保証する。
+* 即発射が必要な弾幕に対応するため、`SpawnBulletPattern` に初弾制御を追加する。
+
+#### 互換資産の整理
+
+次段階で最低限必要なこと：
+
+* 旧 flat `attacks` 資産の migration ルートを用意する。
+* `BossActionService` など旧簡易経路の役割を整理し、正規設計と混在させない。
+
+---
+
+## 9. 段階導入方針
 
 ### Phase 1：最小ボス基盤
 
@@ -475,49 +760,62 @@ BossRoot
 * `BossSpawner`
 * 見た目と Hurtbox の分離
 
-### Phase 2：基本攻撃
-
-* 近接攻撃 1 種
-* 直線弾 1 種
-* 突進 1 種
-* Animation Event による近接同期
-
-### Phase 3：現行弾幕基盤
+### Phase 2：状態機械基盤
 
 * `BossStateMachine`
-* `BossAttackController`
-* `ConfiguredBossAttack`
-* `BossAttackPatternFactory`
-* `SingleShotPattern` / `NWayShotPattern` / `BurstShotPattern`
-* `BossBulletPatternConfig`
-* `EnemyBulletService`
 * `BossBehaviorUpdateResult`
+* `Intro` / `Phase` / `Dead`
+* イントロ signal と撃破完了 signal の接続
 
-補足：
+### Phase 3：Action / Timeline 基盤
 
-* 現行実装で整理済みなのは、状態機械、攻撃選択、個別パターンクラス分割、Factory 分離まで。
-* `PatternRunner`、`EmitterController`、詳細 `SpellDefinition` はこの次段階で導入する。
+* `BossActionController`
+* `ConfiguredBossAction`
+* `BossActionTimelineExecutor`
+* `BossActionDefinition`
+* `BossActionPlan`
+* `SpawnBulletPattern`
+* `EmitSignal`
+* `SingleShotPattern` / `NWayShotPattern` / `BurstShotPattern`
+* `BossBulletPatternEmitterRuntime`
 
-### Phase 4：複合ボス
+### Phase 4：Window 接続
+
+* `BossBehaviorUpdateResult` への `ActiveWindows` 公開
+* `HitboxWindow`
+* `HurtboxWindow`
+* `InvincibleWindow`
+* `MoveWindow`
+* `CancelWindow`
+
+### Phase 5：演出 command 接続
+
+* `PlayAnimation`
+* `PlayEffect`
+* `PlaySound`
+* `SpawnEnemy`
+* `BossAnimatorBridge`
+* `VFXRoot`
+* summon / familiar / turret 系の橋渡し
+
+### Phase 6：複合ボス
 
 * `BossPart`
 * `BossAssembler`
 * `BossLayout`
 * 左右砲台、回転ユニット、補助部位
 
-### Phase 5：複雑弾幕
+### Phase 7：複雑弾幕
 
-* `PatternRunner`
-* `SpellDefinition`
-* `EmitterController`
 * Spiral
 * AlternatingSpiral
 * RandomSpread
 * Familiar を用いた空間分担
 * 分裂弾
 * フェーズ別スペル切り替え
+* 詳細 emitter 制御
 
-### Phase 6：ゲーム固有要素接続
+### Phase 8：ゲーム固有要素接続
 
 * ダッシュ吸収によるエネルギー化
 * 特殊攻撃による弾消し
@@ -526,30 +824,32 @@ BossRoot
 
 ---
 
-## 9. 非目標
+## 10. 非目標
 
 * 全敵に共通する完全汎用 AI フレームワーク
 * ノーコードで全弾幕を記述する DSL の完成
 * あらゆる部位関係を自動解決する超汎用アセンブラ
 * 物理ベースの複雑な破壊シミュレーション
+* 弾 1 発ごとに個別 coroutine や個別 AI を持たせる構造
 
 ---
 
-## 10. アンチパターン
+## 11. アンチパターン
 
 * バトル全体進行とボス固有進行を 1 クラスに混在させる
-* フェーズ選択、攻撃選択、発射パターン生成を 1 クラスに詰め込む
+* フェーズ選択、action 選択、timeline 実行、弾幕生成を 1 クラスに詰め込む
+* `BossActionDefinition` を再び弾幕専用の flat 定義へ戻す
+* `Command` と `Window` を区別せず、すべてを animation event のみで表現する
+* `Window` を contract に置きながら外部へ一切公開しないまま運用し続ける
+* 未対応 command を silently ignore する
 * 弾を 1 発ずつ `Instantiate / Destroy` し続ける
-* 弾 1 発ごとに Coroutine を持たせる
+* 弾 1 発ごとに coroutine を持たせる
 * 見た目と被弾判定を完全一致前提で設計する
-* 弾幕ロジックを Animator に埋め込みすぎる
 * ScriptableObject に実行時状態を持たせる
 * ボス固有コードが敵弾インスタンスを個別に握り続ける
 
 ---
 
-## 11. 最終方針
+## 12. 最終方針
 
-> ボス固有進行は `BossStateMachine` を中心に `Intro` / `Phase` / `Dead` で管理し、フェーズ内攻撃は `BossAttackController`、低レベル弾幕は `IBossAttackPattern` 群へ分離する。外周のバトル進行は `BattleFlowService` に残し、両者は `BossBehaviorUpdateResult` のシグナルで接続する。ボス定義の正規形は `InitialStateId` + `States` + `Attacks` とし、旧 `PhasePatterns` は互換入力としてのみ扱う。将来的に詳細弾幕が必要になった段階で `PatternRunner`、`EmitterController`、`SpellDefinition` を追加し、複雑さは時間制御と発射規則の合成で表現する。
-
-この方針により、複数ゲージ、イントロ演出、撃破演出、ダッシュ吸収、ボス接触ダメージ、ドロップ、特殊攻撃との整合を保ったまま、将来的な複合ボスと高密度弾幕へ拡張できる。
+> ボス固有進行は `BossStateMachine` を中心に `Intro` / `Phase` / `Dead` で管理し、フェーズ内 action は `BossActionController` が選択し、下位実行は `ConfiguredBossAction + BossActionTimelineExecutor` が frame 基準で処理する。`Command` は瞬間イベント、`Window` は区間イベントとし、弾幕は `SpawnBulletPattern` command から起動される下位 `IBossAttackPattern` 群へ分離する。外周のバトル進行は `BattleFlowService` に残し、両者は `BossBehaviorUpdateResult` と signal で接続する。正規入力は `InitialStateId + States + Actions` とし、旧 `PhasePatterns` は互換入力専用とする。Animation、SE、VFX、召喚、近接判定、無敵、移動はすべて同じ timeline 基盤へ統合し、ボス実装を弾幕専用構造へ戻さない。

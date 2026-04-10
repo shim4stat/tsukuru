@@ -1,5 +1,5 @@
 ﻿using System;
-using Game.Presentation.Game;
+using Game.Presentation.Game.Boss.Runtime;
 using NumericsVector3 = System.Numerics.Vector3;
 using UnityEngine;
 

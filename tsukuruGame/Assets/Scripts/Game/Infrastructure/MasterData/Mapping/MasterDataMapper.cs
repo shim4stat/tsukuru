@@ -52,31 +52,17 @@ namespace Game.Infrastructure.MasterData.Mapping
                     gauges.Add(source[i]);
             }
 
-            List<BossPhasePatternContract> phasePatterns = new List<BossPhasePatternContract>();
-            IReadOnlyList<BossPhasePatternAsset> phaseSource = asset.PhasePatterns;
-            if (phaseSource != null)
+            List<BossActionDefinitionContract> actions = new List<BossActionDefinitionContract>();
+            IReadOnlyList<BossActionDefinitionAsset> actionSource = asset.Actions;
+            if (actionSource != null)
             {
-                for (int i = 0; i < phaseSource.Count; i++)
+                for (int i = 0; i < actionSource.Count; i++)
                 {
-                    BossPhasePatternAsset phase = phaseSource[i];
-                    if (phase == null)
+                    BossActionDefinitionAsset action = actionSource[i];
+                    if (action == null)
                         continue;
 
-                    phasePatterns.Add(ToContract(phase));
-                }
-            }
-
-            List<BossAttackDefinitionContract> attacks = new List<BossAttackDefinitionContract>();
-            IReadOnlyList<BossAttackDefinitionAsset> attackSource = asset.Attacks;
-            if (attackSource != null)
-            {
-                for (int i = 0; i < attackSource.Count; i++)
-                {
-                    BossAttackDefinitionAsset attack = attackSource[i];
-                    if (attack == null)
-                        continue;
-
-                    attacks.Add(ToContract(attack));
+                    actions.Add(ToContract(action));
                 }
             }
 
@@ -94,21 +80,15 @@ namespace Game.Infrastructure.MasterData.Mapping
                 }
             }
 
-            string initialStateId = asset.InitialStateId ?? string.Empty;
-            if (states.Count == 0 || attacks.Count == 0 || string.IsNullOrWhiteSpace(initialStateId))
-                BuildLegacyBossBehavior(gauges, asset.ActionIntervalSeconds, phasePatterns, out initialStateId, out states, out attacks);
-
             return new BossParamsContract
             {
                 Id = asset.Id ?? string.Empty,
                 GaugeMaxHps = gauges,
                 BaseDropEnergyAmount = asset.BaseDropEnergyAmount,
                 MinDropIntervalSeconds = asset.MinDropIntervalSeconds,
-                ActionIntervalSeconds = asset.ActionIntervalSeconds,
-                InitialStateId = initialStateId,
+                InitialStateId = asset.InitialStateId ?? string.Empty,
                 States = states,
-                Attacks = attacks,
-                PhasePatterns = phasePatterns,
+                Actions = actions,
             };
         }
 
@@ -161,19 +141,20 @@ namespace Game.Infrastructure.MasterData.Mapping
             };
         }
 
-        private static BossPhasePatternContract ToContract(BossPhasePatternAsset asset)
+        private static BossBulletPatternDefinitionContract ToContract(BossBulletPatternDefinitionAsset asset)
         {
             if (asset == null)
                 throw new ArgumentNullException(nameof(asset));
 
-            return new BossPhasePatternContract
+            return new BossBulletPatternDefinitionContract
             {
                 PatternType = asset.PatternType,
-                FireIntervalSeconds = asset.FireIntervalSeconds,
+                InitialDelayFrames = asset.InitialDelayFrames,
+                FireIntervalFrames = asset.FireIntervalFrames,
                 ShotCount = asset.ShotCount,
                 SpreadDegrees = asset.SpreadDegrees,
                 BurstShotCount = asset.BurstShotCount,
-                BurstShotIntervalSeconds = asset.BurstShotIntervalSeconds,
+                BurstShotIntervalFrames = asset.BurstShotIntervalFrames,
                 BulletSpeed = asset.BulletSpeed,
                 BulletLifetimeSeconds = asset.BulletLifetimeSeconds,
                 BulletDamage = asset.BulletDamage,
@@ -184,38 +165,146 @@ namespace Game.Infrastructure.MasterData.Mapping
             };
         }
 
-        private static BossAttackDefinitionContract ToContract(BossAttackDefinitionAsset asset)
+        private static BossActionCommandContract ToContract(BossActionCommandAsset asset)
         {
             if (asset == null)
                 throw new ArgumentNullException(nameof(asset));
 
-            return new BossAttackDefinitionContract
+            return new BossActionCommandContract
+            {
+                TriggerFrame = asset.TriggerFrame,
+                CommandType = asset.CommandType,
+                AnimationStateName = asset.AnimationStateName ?? string.Empty,
+                BulletPattern = asset.BulletPattern != null ? ToContract(asset.BulletPattern) : null,
+                EmitterDurationFrames = asset.EmitterDurationFrames,
+                SignalId = asset.SignalId ?? string.Empty,
+                CrossFadeFrames = asset.CrossFadeFrames,
+                EnemyDefinitionId = asset.EnemyDefinitionId ?? string.Empty,
+                SpawnOffset = ToNumericsVector3(asset.SpawnOffset),
+                EffectId = asset.EffectId ?? string.Empty,
+                EffectLocalOffset = ToNumericsVector3(asset.EffectLocalOffset),
+                SoundId = asset.SoundId ?? string.Empty,
+                VolumeScale = asset.VolumeScale,
+            };
+        }
+
+        private static BossMoveWindowPayloadContract ToContract(BossMoveWindowPayloadAsset asset)
+        {
+            if (asset == null)
+                return null;
+
+            return new BossMoveWindowPayloadContract
+            {
+                VelocityPerSecond = ToNumericsVector3(asset.VelocityPerSecond),
+            };
+        }
+
+        private static BossHitboxWindowPayloadContract ToContract(BossHitboxWindowPayloadAsset asset)
+        {
+            if (asset == null)
+                return null;
+
+            return new BossHitboxWindowPayloadContract
+            {
+                Offset = ToNumericsVector3(asset.Offset),
+                Radius = asset.Radius,
+                Damage = asset.Damage,
+            };
+        }
+
+        private static BossHurtboxWindowPayloadContract ToContract(BossHurtboxWindowPayloadAsset asset)
+        {
+            if (asset == null)
+                return null;
+
+            return new BossHurtboxWindowPayloadContract
+            {
+                Offset = ToNumericsVector3(asset.Offset),
+                Radius = asset.Radius,
+            };
+        }
+
+        private static BossCancelWindowPayloadContract ToContract(BossCancelWindowPayloadAsset asset)
+        {
+            if (asset == null)
+                return null;
+
+            return new BossCancelWindowPayloadContract
+            {
+                CancelTag = asset.CancelTag ?? string.Empty,
+            };
+        }
+
+        private static BossActionWindowContract ToContract(BossActionWindowAsset asset)
+        {
+            if (asset == null)
+                throw new ArgumentNullException(nameof(asset));
+
+            return new BossActionWindowContract
             {
                 Id = asset.Id ?? string.Empty,
-                PatternType = asset.PatternType,
-                FireIntervalSeconds = asset.FireIntervalSeconds,
-                ShotCount = asset.ShotCount,
-                SpreadDegrees = asset.SpreadDegrees,
-                BurstShotCount = asset.BurstShotCount,
-                BurstShotIntervalSeconds = asset.BurstShotIntervalSeconds,
-                BulletSpeed = asset.BulletSpeed,
-                BulletLifetimeSeconds = asset.BulletLifetimeSeconds,
-                BulletDamage = asset.BulletDamage,
-                AbsorbableEnergyAmount = asset.AbsorbableEnergyAmount,
-                BulletBehaviorType = asset.BulletBehaviorType,
-                SpawnOffset = ToNumericsVector3(asset.SpawnOffset),
-                FireDirection = ToNumericsVector3(asset.FireDirection),
-                ActiveDurationSeconds = asset.ActiveDurationSeconds,
+                WindowType = asset.WindowType,
+                StartFrameInclusive = asset.StartFrameInclusive,
+                EndFrameExclusive = asset.EndFrameExclusive,
+                MoveWindow = ToContract(asset.MoveWindow),
+                HitboxWindow = ToContract(asset.HitboxWindow),
+                HurtboxWindow = ToContract(asset.HurtboxWindow),
+                CancelWindow = ToContract(asset.CancelWindow),
             };
         }
 
-        private static BossAttackPlanContract ToContract(BossAttackPlanAsset asset)
+        private static BossActionDefinitionContract ToContract(BossActionDefinitionAsset asset)
+        {
+            if (asset == null)
+                throw new ArgumentNullException(nameof(asset));
+
+            List<BossActionCommandContract> commands = new List<BossActionCommandContract>();
+            IReadOnlyList<BossActionCommandAsset> commandSource = asset.Commands;
+            if (commandSource != null)
+            {
+                for (int i = 0; i < commandSource.Count; i++)
+                {
+                    BossActionCommandAsset command = commandSource[i];
+                    if (command == null)
+                        continue;
+
+                    commands.Add(ToContract(command));
+                }
+            }
+
+            List<BossActionWindowContract> windows = new List<BossActionWindowContract>();
+            IReadOnlyList<BossActionWindowAsset> windowSource = asset.Windows;
+            if (windowSource != null)
+            {
+                for (int i = 0; i < windowSource.Count; i++)
+                {
+                    BossActionWindowAsset window = windowSource[i];
+                    if (window == null)
+                        continue;
+
+                    windows.Add(ToContract(window));
+                }
+            }
+
+            return new BossActionDefinitionContract
+            {
+                Id = asset.Id ?? string.Empty,
+                AnimationStateName = asset.AnimationStateName ?? string.Empty,
+                EndConditionType = asset.EndConditionType,
+                CancelPolicy = asset.CancelPolicy,
+                TotalDurationFrames = asset.TotalDurationFrames,
+                Commands = commands,
+                Windows = windows,
+            };
+        }
+
+        private static BossActionPlanContract ToContract(BossActionPlanAsset asset)
         {
             if (asset == null)
                 throw new ArgumentNullException(nameof(asset));
 
             List<string> openingSequence = new List<string>();
-            IReadOnlyList<string> openingSource = asset.OpeningSequenceAttackIds;
+            IReadOnlyList<string> openingSource = asset.OpeningSequenceActionIds;
             if (openingSource != null)
             {
                 for (int i = 0; i < openingSource.Count; i++)
@@ -223,17 +312,17 @@ namespace Game.Infrastructure.MasterData.Mapping
             }
 
             List<string> randomSequence = new List<string>();
-            IReadOnlyList<string> randomSource = asset.RandomAttackIds;
+            IReadOnlyList<string> randomSource = asset.RandomActionIds;
             if (randomSource != null)
             {
                 for (int i = 0; i < randomSource.Count; i++)
                     randomSequence.Add(randomSource[i] ?? string.Empty);
             }
 
-            return new BossAttackPlanContract
+            return new BossActionPlanContract
             {
-                OpeningSequenceAttackIds = openingSequence,
-                RandomAttackIds = randomSequence,
+                OpeningSequenceActionIds = openingSequence,
+                RandomActionIds = randomSequence,
                 HistoryWindow = asset.HistoryWindow,
             };
         }
@@ -275,185 +364,8 @@ namespace Game.Infrastructure.MasterData.Mapping
             {
                 Id = asset.Id ?? string.Empty,
                 StateType = asset.StateType,
-                AttackPlan = asset.AttackPlan != null ? ToContract(asset.AttackPlan) : new BossAttackPlanContract(),
+                ActionPlan = asset.ActionPlan != null ? ToContract(asset.ActionPlan) : new BossActionPlanContract(),
                 Transitions = transitions,
-            };
-        }
-
-        private static void BuildLegacyBossBehavior(
-            IReadOnlyList<int> gauges,
-            float actionIntervalSeconds,
-            IReadOnlyList<BossPhasePatternContract> phasePatterns,
-            out string initialStateId,
-            out List<BossStateDefinitionContract> states,
-            out List<BossAttackDefinitionContract> attacks)
-        {
-            states = new List<BossStateDefinitionContract>();
-            attacks = new List<BossAttackDefinitionContract>();
-
-            if (gauges == null || gauges.Count == 0)
-            {
-                initialStateId = string.Empty;
-                return;
-            }
-
-            List<BossAttackDefinitionContract> legacyAttacks = BuildLegacyAttacks(gauges.Count, actionIntervalSeconds, phasePatterns);
-            attacks.AddRange(legacyAttacks);
-
-            const string introStateId = "legacy_intro";
-            const string deadStateId = "legacy_dead";
-
-            states.Add(
-                new BossStateDefinitionContract
-                {
-                    Id = introStateId,
-                    StateType = BossStateType.Intro,
-                    Transitions = new BossStateTransitionContract[]
-                    {
-                        new BossStateTransitionContract
-                        {
-                            ConditionType = BossTransitionConditionType.ExternalSignal,
-                            SignalId = BossStateSignalIds.IntroFinished,
-                            NextStateId = "legacy_phase_0",
-                        },
-                    },
-                });
-
-            for (int i = 0; i < legacyAttacks.Count; i++)
-            {
-                string stateId = $"legacy_phase_{i}";
-                string attackId = legacyAttacks[i].Id;
-                BossStateTransitionContract transition;
-                if (i < legacyAttacks.Count - 1)
-                {
-                    transition = new BossStateTransitionContract
-                    {
-                        ConditionType = BossTransitionConditionType.CurrentGaugeIndexAtOrAbove,
-                        Threshold = i + 1,
-                        NextStateId = $"legacy_phase_{i + 1}",
-                    };
-                }
-                else
-                {
-                    transition = new BossStateTransitionContract
-                    {
-                        ConditionType = BossTransitionConditionType.CurrentHpRateAtOrBelow,
-                        Threshold = 0f,
-                        NextStateId = deadStateId,
-                    };
-                }
-
-                states.Add(
-                    new BossStateDefinitionContract
-                    {
-                        Id = stateId,
-                        StateType = BossStateType.Phase,
-                        AttackPlan = new BossAttackPlanContract
-                        {
-                            OpeningSequenceAttackIds = new[] { attackId },
-                            RandomAttackIds = new[] { attackId },
-                            HistoryWindow = 0,
-                        },
-                        Transitions = new[] { transition },
-                    });
-            }
-
-            states.Add(
-                new BossStateDefinitionContract
-                {
-                    Id = deadStateId,
-                    StateType = BossStateType.Dead,
-                    Transitions = new BossStateTransitionContract[]
-                    {
-                        new BossStateTransitionContract
-                        {
-                            ConditionType = BossTransitionConditionType.ElapsedTime,
-                            Threshold = 0.5f,
-                            NextStateId = string.Empty,
-                        },
-                    },
-                });
-
-            initialStateId = introStateId;
-        }
-
-        private static List<BossAttackDefinitionContract> BuildLegacyAttacks(
-            int gaugeCount,
-            float actionIntervalSeconds,
-            IReadOnlyList<BossPhasePatternContract> phasePatterns)
-        {
-            List<BossAttackDefinitionContract> attacks = new List<BossAttackDefinitionContract>(gaugeCount);
-            for (int i = 0; i < gaugeCount; i++)
-            {
-                BossPhasePatternContract sourcePattern =
-                    phasePatterns != null && i < phasePatterns.Count && phasePatterns[i] != null
-                        ? phasePatterns[i]
-                        : CreateDefaultLegacyPhasePattern(i, gaugeCount, actionIntervalSeconds);
-
-                attacks.Add(
-                    new BossAttackDefinitionContract
-                    {
-                        Id = $"legacy_attack_{i}",
-                        PatternType = sourcePattern.PatternType,
-                        FireIntervalSeconds = sourcePattern.FireIntervalSeconds,
-                        ShotCount = sourcePattern.ShotCount,
-                        SpreadDegrees = sourcePattern.SpreadDegrees,
-                        BurstShotCount = sourcePattern.BurstShotCount,
-                        BurstShotIntervalSeconds = sourcePattern.BurstShotIntervalSeconds,
-                        BulletSpeed = sourcePattern.BulletSpeed,
-                        BulletLifetimeSeconds = sourcePattern.BulletLifetimeSeconds,
-                        BulletDamage = sourcePattern.BulletDamage,
-                        AbsorbableEnergyAmount = sourcePattern.AbsorbableEnergyAmount,
-                        BulletBehaviorType = sourcePattern.BulletBehaviorType,
-                        SpawnOffset = sourcePattern.SpawnOffset,
-                        FireDirection = sourcePattern.FireDirection,
-                        ActiveDurationSeconds = float.PositiveInfinity,
-                    });
-            }
-
-            return attacks;
-        }
-
-        private static BossPhasePatternContract CreateDefaultLegacyPhasePattern(
-            int gaugeIndex,
-            int gaugeCount,
-            float actionIntervalSeconds)
-        {
-            BossPhasePatternContract pattern = CreateBaseLegacyPhasePattern(actionIntervalSeconds);
-            if (gaugeIndex == 0)
-                return pattern;
-
-            if (gaugeIndex == gaugeCount - 1)
-            {
-                pattern.PatternType = BossAttackPatternType.BurstShot;
-                pattern.BurstShotCount = 3;
-                pattern.BurstShotIntervalSeconds = 0.15f;
-                return pattern;
-            }
-
-            pattern.PatternType = BossAttackPatternType.NWayShot;
-            pattern.ShotCount = 3;
-            pattern.SpreadDegrees = 30.0f;
-            return pattern;
-        }
-
-        private static BossPhasePatternContract CreateBaseLegacyPhasePattern(float actionIntervalSeconds)
-        {
-            return new BossPhasePatternContract
-            {
-                PatternType = BossAttackPatternType.SingleShot,
-                FireIntervalSeconds = actionIntervalSeconds > 0f ? actionIntervalSeconds : 1.0f,
-                ShotCount = 1,
-                SpreadDegrees = 0f,
-                BurstShotCount = 3,
-                BurstShotIntervalSeconds = 0.15f,
-                BulletSpeed = 3.0f,
-                BulletLifetimeSeconds = 2.0f,
-                BulletDamage = 1,
-                AbsorbableEnergyAmount = 1,
-                BulletBehaviorType = EnemyBulletBehaviorTypeContract.Straight,
-                SpawnOffset = NumericsVector3.Zero,
-                FireDirection = new NumericsVector3(0f, -1f, 0f),
             };
         }
 
