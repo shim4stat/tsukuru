@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Game.Contracts.MasterData.Models;
 
@@ -98,7 +98,7 @@ namespace Game.Domain.Battle
                 _currentState.Exit();
                 frameState = BossActionFrameState.Empty;
 
-                if (stateResult.IsTerminalCompletion)
+                if (stateResult.IsTerminalCompletion) 
                 {
                     _currentState = null;
                     if (previousType == BossStateType.Dead)

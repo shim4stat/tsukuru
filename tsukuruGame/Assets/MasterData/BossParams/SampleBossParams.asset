@@ -17,4 +17,20 @@ MonoBehaviour:
   baseDropEnergyAmount: 100
   minDropIntervalSeconds: 100
   actionIntervalSeconds: 16
-  phasePatterns: []
+  initialStateId: 
+  states: []
+  actions: []
+  phasePatterns:
+  - patternType: 0
+    fireIntervalSeconds: 0
+    shotCount: 0
+    spreadDegrees: 0
+    burstShotCount: 0
+    burstShotIntervalSeconds: 0
+    bulletSpeed: 0
+    bulletLifetimeSeconds: 0
+    bulletDamage: 0
+    absorbableEnergyAmount: 0
+    bulletBehaviorType: 0
+    spawnOffset: {x: 0, y: 0, z: 0}
+    fireDirection: {x: 0, y: 0, z: 0}
