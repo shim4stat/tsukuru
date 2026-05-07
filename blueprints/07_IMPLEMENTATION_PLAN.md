@@ -249,32 +249,33 @@
 * BOSS-02 EnemyBullet最小（位置/速度/挙動種別を含む生成・更新・寿命/消滅判定）
 * BOSS-03 GameScene接続（Battle中に `BossStateMachine.Update` を実行し、`SpawnRequests` と `BossActionFrameState` を反映）
 * BOSS-04 Boss被弾入口の統一（Robot側からの正式経路を1つに固定、EN-01と統合）
-* BOSS-05 Action/Timeline連動（`BossActionController`、`ConfiguredBossAction`、`SpawnBulletPattern`、`SingleShot` / `NWayShot` / `BurstShot`）
-* BOSS-06 SpawnEnemy command 接続（子機/使い魔/砲台の生成要求1種）
+* BOSS-05 Procedural Boss Action API（`BossActionBase`、`BossActionContext`、弾/移動/判定/演出 event 出力）
+* BOSS-06 BossActionFactory/Registry（action id/type id から C# 専用 action または legacy action を生成）
 * BOSS-07 ドロップ間隔制限（0.1秒制限をDomainで担保）
 * BOSS-08 Retry初期化の完成（Boss/EnemyBullet/関連タイマのリセット）
 * BOSS-09 ボスHP複数ゲージUI（メイン＋サブゲージ表示）
 * BOSS-10 ボス撃破演出／リザルト表示（BossDefeatedフェーズ完了条件）
-* BOSS-11 BossActionDefinitionのMasterData化（`InitialStateId + States + Actions`、command/window payload、旧資産 migration）
+* BOSS-11 phase_01専用C# action実装（上下反復移動、回転ショット、hurtbox、アニメ/SE event）
 * BOSS-12 Boss被弾時ドロップ計算（基礎量×攻撃倍率）とSpawnRequest化
 * BOSS-13 ダッシュ接触によるBossダメージ経路（PL連携）を統合
+* BOSS-14 BossActionDefinitionのMasterData更新（C# action 参照 metadata、legacy timeline payload、旧資産 migration）
 
 依存：BOSS-01 → BOSS-02 → BOSS-03
 依存：ROB-03 → BOSS-04
 依存：BOSS-03/BOSS-04 → BOSS-05/BOSS-06/BOSS-07 → BOSS-08
 依存：BOSS-05 → BOSS-09
 依存：BOSS-08 → BOSS-10
-依存：BOSS-05/BOSS-06 → BOSS-11
+依存：BOSS-05/BOSS-06 → BOSS-11 → BOSS-14
 依存：BOSS-04/BOSS-07 → BOSS-12
 依存：PL-03/PL-04/PL-05 → BOSS-13
 
 ### 6.10 Bossの検証タスク（回帰防止）
 
-* DBG-10 BossStateMachine/Timelineテスト（Intro遷移、command発火、FrameState公開、action跨ぎ）
+* DBG-10 BossStateMachine/Procedural Actionテスト（Intro遷移、C# action 実行、FrameState公開、action跨ぎ）
 * DBG-11 BossDamage/BattleFlowテスト（ゲージ遷移、撃破遷移、Retry再開）
 * DBG-12 Boss統合手動確認（BossBoot→Combat→BossDefeated→BattleEnd、例外ログ0）
 
-依存：BOSS-01〜BOSS-13 → DBG-10/11/12
+依存：BOSS-01〜BOSS-14 → DBG-10/11/12
 
 ---
 

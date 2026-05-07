@@ -168,6 +168,8 @@ namespace Game.Infrastructure.MasterData.Assets
     public sealed class BossActionDefinitionAsset
     {
         [SerializeField] private string id = string.Empty;
+        [SerializeField] private string actionTypeId = string.Empty;
+        [SerializeField] private string configKey = string.Empty;
         [SerializeField] private string animationStateName = string.Empty;
         [SerializeField] private BossActionEndConditionType endConditionType = BossActionEndConditionType.Manual;
         [SerializeField] private BossActionCancelPolicy cancelPolicy = BossActionCancelPolicy.AlwaysCancelable;
@@ -176,6 +178,8 @@ namespace Game.Infrastructure.MasterData.Assets
         [SerializeField] private List<BossActionWindowAsset> windows = new List<BossActionWindowAsset>();
 
         public string Id => id;
+        public string ActionTypeId => actionTypeId;
+        public string ConfigKey => configKey;
         public string AnimationStateName => animationStateName;
         public BossActionEndConditionType EndConditionType => endConditionType;
         public BossActionCancelPolicy CancelPolicy => cancelPolicy;

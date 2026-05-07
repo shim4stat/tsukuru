@@ -286,6 +286,24 @@ namespace Game.Domain.Battle
             if (string.IsNullOrWhiteSpace(action.Id))
                 throw new InvalidOperationException("Boss action id is null or empty.");
 
+            bool isProceduralAction = BossActionFactory.IsProceduralAction(action);
+            if (isProceduralAction)
+            {
+                if (!BossActionFactory.IsKnownActionType(action.ActionTypeId))
+                {
+                    throw new InvalidOperationException(
+                        $"Unknown procedural boss action type. actionId={action.Id}, actionTypeId={action.ActionTypeId}");
+                }
+
+                if (action.TotalDurationFrames < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Procedural boss action duration metadata must be non-negative. actionId={action.Id}, totalDurationFrames={action.TotalDurationFrames}");
+                }
+
+                return;
+            }
+
             bool hasCommands = action.Commands != null && action.Commands.Count > 0;
             bool hasWindows = action.Windows != null && action.Windows.Count > 0;
             bool hasActionAnimation = !string.IsNullOrWhiteSpace(action.AnimationStateName);
@@ -546,7 +564,7 @@ namespace Game.Domain.Battle
         {
             Dictionary<string, IBossAction> actionsById = new Dictionary<string, IBossAction>(StringComparer.Ordinal);
             foreach (KeyValuePair<string, BossActionDefinitionContract> pair in runtimeContext.ActionDefinitions)
-                actionsById.Add(pair.Key, new ConfiguredBossAction(pair.Value));
+                actionsById.Add(pair.Key, BossActionFactory.Create(pair.Value));
 
             return new BossActionController(
                 actionPlan ?? new BossActionPlanContract(),

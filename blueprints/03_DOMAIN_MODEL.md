@@ -215,7 +215,7 @@
 
 - `RobotBulletDefinition`, `EnemyBulletDefinition`（SO）
 - `EnemyBulletBehaviorType`
-- `EnemyBulletSpawnRequest`（`BossActionService` が生成する実行時DTO。位置、速度、寿命、威力、吸収量、挙動種別を含む）
+- `EnemyBulletSpawnRequest`（`IBossAction` / `BossActionContext` 経由で生成される実行時DTO。位置、速度、寿命、威力、吸収量、挙動種別を含む）
 - `ItemDefinition`（SO：回復薬／無敵／エネルギー／特殊エネルギー。種別ごとの効果量に加えて、同時にフィールド上に存在できる最大個数（例：回復3 / 無敵2 / エネルギー200）などの上限情報も持つ）
 
 **サービス**
@@ -253,9 +253,12 @@
 
 **サービス**
 
-- `BossActionService`
-    - Combat 中のみ Boss の現在 `Boss phase` に対応する攻撃パターンを進行させ、`EnemyBulletSpawnRequest` を返す。
-    - フェーズ切替時にパターン内部状態を `Reset()` し、同一サービス内で `SingleShot` / `NWayShot` / `BurstShot` を切り替える。
+- `BossStateMachine`
+    - ボス固有の `Intro` / `Phase` / `Dead` を管理し、Combat 中の action 進行結果を返す。
+- `BossActionController`
+    - `BossActionPlan` に従って C# 専用 action を選択、開始、更新、完了させる。
+- `BossActionContext`
+    - C# action から弾生成、移動、判定、演出 event、signal を安全に出力する。
 - `EnemySpawnService`
     - ボスの攻撃パターンと `Boss phase` に応じて雑魚敵をスポーンさせる責務を持つ。例えば `UpdateBossEnemySpawns(Boss boss, BattleContext ctx, float currentTime)` のようなメソッドで、Boss の現在 `Boss phase` と攻撃パターン定義（MasterData）を参照しながら `EnemySpawnRequest` を生成し、`BattleContext` 内の `enemies` コレクションに新たな `Enemy` を追加するきっかけを提供する。
 
@@ -497,9 +500,20 @@ class Enemy {
     bool IsAlive();
 }
 
-class BossActionService {
-    IReadOnlyList<EnemyBulletSpawnRequest> Update(BattleContext context, float deltaTime);
-    void Reset();
+class BossStateMachine {
+    BossBehaviorUpdateResult Update(BattleContext context, float deltaTime);
+    void NotifySignal(string signalId);
+}
+
+class BossActionController {
+    BossActionExecutionResult Update(BattleContext context, float deltaTime);
+}
+
+class BossActionContext {
+    void FireBullet(Vector3 direction, BossBulletSpec bullet);
+    void MoveBossTo(Vector3 position);
+    void PlayAnimation(string stateName);
+    void SetHurtbox(Vector3 offset, float radius);
 }
 
 class Boss {

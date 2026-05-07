@@ -176,18 +176,20 @@
 `BossActionDefinition`
 
 * `string id`
+* `string actionTypeId`（C# action class / registry key）
 * `string animationStateName`
 * `BossActionEndConditionType endConditionType`
 * `BossActionCancelPolicy cancelPolicy`
 * `int totalDurationFrames`
-* `List<BossActionCommand> commands`
-* `List<BossActionWindow> windows`
+* `string configKey` または action ごとの専用 config
+* （互換）`List<BossActionCommand> commands`
+* （互換）`List<BossActionWindow> windows`
 
 `BossActionCommand`
 
 * `int triggerFrame`
 * `BossActionCommandType commandType`
-* command ごとの payload（弾幕、signal、animation、spawn、effect、sound）
+* legacy timeline 用 payload（弾幕、signal、animation、spawn、effect、sound）
 
 `BossActionWindow`
 
@@ -195,7 +197,7 @@
 * `BossActionWindowType windowType`
 * `int startFrameInclusive`
 * `int endFrameExclusive`
-* window ごとの payload（move、hitbox、hurtbox、cancel など）
+* legacy timeline 用 payload（move、hitbox、hurtbox、cancel など）
 
 `BossBulletPatternDefinition`
 
@@ -216,7 +218,9 @@
 
 補足：
 
-* 現行の正規経路は `BossStateMachine` → `BossActionController` → `ConfiguredBossAction` → timeline である。
+* 今後の正規経路は `BossStateMachine` → `BossActionController` → `BossActionFactory/Registry` → C# 専用 action である。
+* `BossActionDefinition` は C# action 参照/登録メタデータとして扱い、実行内容そのものは action class 側に書く。
+* `commands` / `windows` は現行実装に残る legacy timeline 互換 payload であり、新規の複雑なボス行動の正規入力ではない。
 * `ActionIntervalSeconds` と `PhasePatterns` は現行 `BossParamsContract` の正規 field ではない。
 * `BossParamsAsset` に残る旧 `actionIntervalSeconds` / `phasePatterns` は、必要に応じて `initialStateId + states + actions` へ migration する。
 

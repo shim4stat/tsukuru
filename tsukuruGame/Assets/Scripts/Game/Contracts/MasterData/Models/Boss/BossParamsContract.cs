@@ -75,6 +75,13 @@ namespace Game.Contracts.MasterData.Models
         public const int FramesPerSecond = 60;
     }
 
+    public static class BossActionTypeIds
+    {
+        public const string VerticalSweepShot = "vertical_sweep_shot";
+        public const string LeftOrbitAimedShot = "left_orbit_aimed_shot";
+        public const string PlayerChargeAndReturn = "player_charge_and_return";
+    }
+
     public sealed class BossBulletPatternDefinitionContract
     {
         public BossAttackPatternType PatternType { get; set; } = BossAttackPatternType.SingleShot;
@@ -183,6 +190,10 @@ namespace Game.Contracts.MasterData.Models
     public sealed class BossActionDefinitionContract
     {
         public string Id { get; set; } = string.Empty;
+
+        public string ActionTypeId { get; set; } = string.Empty;
+
+        public string ConfigKey { get; set; } = string.Empty;
 
         public string AnimationStateName { get; set; } = string.Empty;
 

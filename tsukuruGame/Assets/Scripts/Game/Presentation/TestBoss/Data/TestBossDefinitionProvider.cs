@@ -1,10 +1,13 @@
-﻿using System.Numerics;
-using Game.Contracts.MasterData.Models;
+﻿using Game.Contracts.MasterData.Models;
 
 namespace Game.Presentation.TestBoss.Data
 {
     internal static class TestBossDefinitionProvider
     {
+        private const string VerticalSweepActionId = "vertical_sweep";
+        private const string LeftOrbitAimedActionId = "left_orbit_aimed";
+        private const string PlayerChargeReturnActionId = "player_charge_return";
+
         public static BossParamsContract CreateStage01Boss()
         {
             return new BossParamsContract
@@ -16,36 +19,9 @@ namespace Game.Presentation.TestBoss.Data
                 InitialStateId = "intro",
                 Actions = new BossActionDefinitionContract[]
                 {
-                    new BossActionDefinitionContract
-                    {
-                        Id = "phase_01_single",
-                        EndConditionType = BossActionEndConditionType.Manual,
-                        Commands = new BossActionCommandContract[]
-                        {
-                            new BossActionCommandContract
-                            {
-                                TriggerFrame = 0,
-                                CommandType = BossActionCommandType.SpawnBulletPattern,
-                                BulletPattern = new BossBulletPatternDefinitionContract
-                                {
-                                    PatternType = BossAttackPatternType.SingleShot,
-                                    FireIntervalFrames = BossActionTimelineConstants.FramesPerSecond,
-                                    ShotCount = 1,
-                                    SpreadDegrees = 0f,
-                                    BurstShotCount = 1,
-                                    BurstShotIntervalFrames = 9,
-                                    BulletSpeed = 4.0f,
-                                    BulletLifetimeSeconds = 3.0f,
-                                    BulletDamage = 1,
-                                    AbsorbableEnergyAmount = 1,
-                                    BulletBehaviorType = EnemyBulletBehaviorTypeContract.Straight,
-                                    SpawnOffset = new Vector3(0f, -0.5f, 0f),
-                                    FireDirection = new Vector3(0f, -1f, 0f),
-                                },
-                            },
-                        },
-                        Windows = new BossActionWindowContract[0],
-                    },
+                    CreateProceduralAction(VerticalSweepActionId, BossActionTypeIds.VerticalSweepShot),
+                    CreateProceduralAction(LeftOrbitAimedActionId, BossActionTypeIds.LeftOrbitAimedShot),
+                    CreateProceduralAction(PlayerChargeReturnActionId, BossActionTypeIds.PlayerChargeAndReturn),
                 },
                 States = new BossStateDefinitionContract[]
                 {
@@ -69,9 +45,19 @@ namespace Game.Presentation.TestBoss.Data
                         StateType = BossStateType.Phase,
                         ActionPlan = new BossActionPlanContract
                         {
-                            OpeningSequenceActionIds = new[] { "phase_01_single" },
-                            RandomActionIds = new[] { "phase_01_single" },
-                            HistoryWindow = 0,
+                            OpeningSequenceActionIds = new[]
+                            {
+                                VerticalSweepActionId,
+                                LeftOrbitAimedActionId,
+                                PlayerChargeReturnActionId,
+                            },
+                            RandomActionIds = new[]
+                            {
+                                VerticalSweepActionId,
+                                LeftOrbitAimedActionId,
+                                PlayerChargeReturnActionId,
+                            },
+                            HistoryWindow = 1,
                         },
                         Transitions = new BossStateTransitionContract[]
                         {
@@ -98,6 +84,18 @@ namespace Game.Presentation.TestBoss.Data
                         },
                     },
                 },
+            };
+        }
+
+        private static BossActionDefinitionContract CreateProceduralAction(string id, string actionTypeId)
+        {
+            return new BossActionDefinitionContract
+            {
+                Id = id,
+                ActionTypeId = actionTypeId,
+                ConfigKey = string.Empty,
+                EndConditionType = BossActionEndConditionType.Manual,
+                CancelPolicy = BossActionCancelPolicy.AlwaysCancelable,
             };
         }
     }

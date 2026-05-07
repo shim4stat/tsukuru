@@ -289,6 +289,8 @@ namespace Game.Infrastructure.MasterData.Mapping
             return new BossActionDefinitionContract
             {
                 Id = asset.Id ?? string.Empty,
+                ActionTypeId = asset.ActionTypeId ?? string.Empty,
+                ConfigKey = asset.ConfigKey ?? string.Empty,
                 AnimationStateName = asset.AnimationStateName ?? string.Empty,
                 EndConditionType = asset.EndConditionType,
                 CancelPolicy = asset.CancelPolicy,
