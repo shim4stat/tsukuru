@@ -12,19 +12,23 @@ namespace Game.Domain.Battle
     {
         private static readonly IReadOnlyList<EnemyBulletSpawnRequest> EmptySpawnRequests = Array.Empty<EnemyBulletSpawnRequest>();
         private static readonly IReadOnlyList<string> EmptySignals = Array.Empty<string>();
+        private static readonly IReadOnlyList<BossActionCommandEvent> EmptyCommandEvents = Array.Empty<BossActionCommandEvent>();
 
         public static BossActionExecutionResult Empty => new BossActionExecutionResult(
             EmptySpawnRequests,
             EmptySignals,
+            EmptyCommandEvents,
             BossActionFrameState.Empty);
 
         public BossActionExecutionResult(
             IReadOnlyList<EnemyBulletSpawnRequest> spawnRequests,
             IReadOnlyList<string> emittedSignals,
+            IReadOnlyList<BossActionCommandEvent> commandEvents,
             BossActionFrameState frameState)
         {
             SpawnRequests = spawnRequests ?? EmptySpawnRequests;
             EmittedSignals = emittedSignals ?? EmptySignals;
+            CommandEvents = commandEvents ?? EmptyCommandEvents;
             FrameState = frameState;
         }
 
@@ -32,13 +36,26 @@ namespace Game.Domain.Battle
 
         public IReadOnlyList<string> EmittedSignals { get; }
 
+        public IReadOnlyList<BossActionCommandEvent> CommandEvents { get; }
+
         public BossActionFrameState FrameState { get; }
+
+        public bool HasTransientOutput =>
+            HasAny(SpawnRequests) ||
+            HasAny(EmittedSignals) ||
+            HasAny(CommandEvents);
 
         public BossActionExecutionResult Merge(BossActionExecutionResult other)
         {
             IReadOnlyList<EnemyBulletSpawnRequest> mergedSpawnRequests = MergeLists(SpawnRequests, other.SpawnRequests);
             IReadOnlyList<string> mergedSignals = MergeLists(EmittedSignals, other.EmittedSignals);
-            return new BossActionExecutionResult(mergedSpawnRequests, mergedSignals, other.FrameState);
+            IReadOnlyList<BossActionCommandEvent> mergedCommandEvents = MergeLists(CommandEvents, other.CommandEvents);
+            return new BossActionExecutionResult(mergedSpawnRequests, mergedSignals, mergedCommandEvents, other.FrameState);
+        }
+
+        private static bool HasAny<T>(IReadOnlyList<T> source)
+        {
+            return source != null && source.Count > 0;
         }
 
         private static IReadOnlyList<T> MergeLists<T>(IReadOnlyList<T> first, IReadOnlyList<T> second)
@@ -105,7 +122,7 @@ namespace Game.Domain.Battle
 
         bool IsCompleted { get; }
 
-        void Enter(BattleContext context);
+        BossActionExecutionResult Enter(BattleContext context);
 
         BossActionExecutionResult Snapshot();
 

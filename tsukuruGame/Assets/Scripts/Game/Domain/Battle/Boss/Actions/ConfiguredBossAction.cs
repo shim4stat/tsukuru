@@ -31,7 +31,7 @@ namespace Game.Domain.Battle
 
         public BossActionCancelPolicy CancelPolicy => _definition.CancelPolicy;
 
-        public void Enter(BattleContext context)
+        public BossActionExecutionResult Enter(BattleContext context)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -39,6 +39,7 @@ namespace Game.Domain.Battle
             _timelineExecutor.Reset();
             _isActive = true;
             IsCompleted = false;
+            return BuildActionEnterResult();
         }
 
         public BossActionExecutionResult Snapshot()
@@ -82,16 +83,44 @@ namespace Game.Domain.Battle
         {
             _isActive = false;
         }
+
+        private BossActionExecutionResult BuildActionEnterResult()
+        {
+            BossActionExecutionResult snapshot = _timelineExecutor.Snapshot();
+            if (string.IsNullOrWhiteSpace(_definition.AnimationStateName))
+                return snapshot;
+
+            BossActionCommandEvent commandEvent = new BossActionCommandEvent(
+                _definition.Id,
+                BossActionCommandType.PlayAnimation,
+                0,
+                _definition.AnimationStateName,
+                0,
+                string.Empty,
+                Vector3.Zero,
+                string.Empty,
+                Vector3.Zero,
+                string.Empty,
+                1.0f);
+
+            return new BossActionExecutionResult(
+                snapshot.SpawnRequests,
+                snapshot.EmittedSignals,
+                new[] { commandEvent },
+                snapshot.FrameState);
+        }
     }
 
     internal sealed class BossActionTimelineExecutor
     {
         private static readonly IReadOnlyList<EnemyBulletSpawnRequest> EmptySpawnRequests = Array.Empty<EnemyBulletSpawnRequest>();
         private static readonly IReadOnlyList<string> EmptySignals = Array.Empty<string>();
+        private static readonly IReadOnlyList<BossActionCommandEvent> EmptyCommandEvents = Array.Empty<BossActionCommandEvent>();
         private static readonly IReadOnlyList<BossActiveHitbox> EmptyHitboxes = Array.Empty<BossActiveHitbox>();
         private static readonly IReadOnlyList<BossActiveHurtbox> EmptyHurtboxes = Array.Empty<BossActiveHurtbox>();
         private static readonly IReadOnlyList<string> EmptyCancelTags = Array.Empty<string>();
 
+        private readonly string _actionId;
         private readonly List<IndexedBossActionCommand> _commands;
         private readonly IReadOnlyList<BossActionWindowContract> _windows;
         private readonly List<BossBulletPatternEmitterRuntime> _activeEmitters = new List<BossBulletPatternEmitterRuntime>();
@@ -107,6 +136,7 @@ namespace Game.Domain.Battle
 
             _commands = BuildSortedCommands(definition.Commands);
             _windows = definition.Windows ?? Array.Empty<BossActionWindowContract>();
+            _actionId = definition.Id ?? string.Empty;
             _usesExplicitHurtboxWindows = HasWindowType(_windows, BossActionWindowType.HurtboxWindow);
         }
 
@@ -121,7 +151,11 @@ namespace Game.Domain.Battle
 
         public BossActionExecutionResult Snapshot()
         {
-            return new BossActionExecutionResult(EmptySpawnRequests, EmptySignals, BuildFrameStateAtFrame(_currentFrame));
+            return new BossActionExecutionResult(
+                EmptySpawnRequests,
+                EmptySignals,
+                EmptyCommandEvents,
+                BuildFrameStateAtFrame(_currentFrame));
         }
 
         public BossActionExecutionResult Update(BattleContext context, int framesToProcess)
@@ -133,11 +167,12 @@ namespace Game.Domain.Battle
 
             List<EnemyBulletSpawnRequest> spawnRequests = null;
             List<string> emittedSignals = null;
+            List<BossActionCommandEvent> commandEvents = null;
             BossActionFrameState frameState = BuildFrameStateAtFrame(_currentFrame);
 
             for (int i = 0; i < framesToProcess; i++)
             {
-                FireCommandsAtCurrentFrame(ref emittedSignals);
+                FireCommandsAtCurrentFrame(ref emittedSignals, ref commandEvents);
                 TickEmitters(context, ref spawnRequests);
                 frameState = BuildFrameStateAtFrame(_currentFrame);
                 ApplyMovement(context, frameState);
@@ -147,10 +182,13 @@ namespace Game.Domain.Battle
             return new BossActionExecutionResult(
                 spawnRequests ?? EmptySpawnRequests,
                 emittedSignals ?? EmptySignals,
+                commandEvents ?? EmptyCommandEvents,
                 frameState);
         }
 
-        private void FireCommandsAtCurrentFrame(ref List<string> emittedSignals)
+        private void FireCommandsAtCurrentFrame(
+            ref List<string> emittedSignals,
+            ref List<BossActionCommandEvent> commandEvents)
         {
             while (_nextCommandIndex < _commands.Count && _commands[_nextCommandIndex].Command.TriggerFrame == _currentFrame)
             {
@@ -168,12 +206,31 @@ namespace Game.Domain.Battle
                     case BossActionCommandType.SpawnEnemy:
                     case BossActionCommandType.PlayEffect:
                     case BossActionCommandType.PlaySound:
+                        commandEvents ??= new List<BossActionCommandEvent>();
+                        commandEvents.Add(BuildCommandEvent(command));
+                        break;
                     default:
-                        throw new InvalidOperationException($"Unsupported boss action command type at runtime: {command.CommandType}");
+                        throw new InvalidOperationException($"Unknown boss action command type at runtime: {command.CommandType}");
                 }
 
                 _nextCommandIndex++;
             }
+        }
+
+        private BossActionCommandEvent BuildCommandEvent(BossActionCommandContract command)
+        {
+            return new BossActionCommandEvent(
+                _actionId,
+                command.CommandType,
+                command.TriggerFrame,
+                command.AnimationStateName,
+                command.CrossFadeFrames,
+                command.EnemyDefinitionId,
+                command.SpawnOffset,
+                command.EffectId,
+                command.EffectLocalOffset,
+                command.SoundId,
+                command.VolumeScale);
         }
 
         private void TickEmitters(BattleContext context, ref List<EnemyBulletSpawnRequest> spawnRequests)

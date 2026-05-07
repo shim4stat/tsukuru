@@ -1,9 +1,61 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Game.Contracts.MasterData.Models;
 
 namespace Game.Domain.Battle
 {
+    public readonly struct BossActionCommandEvent
+    {
+        public BossActionCommandEvent(
+            string actionId,
+            BossActionCommandType commandType,
+            int triggerFrame,
+            string animationStateName,
+            int crossFadeFrames,
+            string enemyDefinitionId,
+            Vector3 spawnOffset,
+            string effectId,
+            Vector3 effectLocalOffset,
+            string soundId,
+            float volumeScale)
+        {
+            ActionId = actionId ?? string.Empty;
+            CommandType = commandType;
+            TriggerFrame = triggerFrame;
+            AnimationStateName = animationStateName ?? string.Empty;
+            CrossFadeFrames = crossFadeFrames;
+            EnemyDefinitionId = enemyDefinitionId ?? string.Empty;
+            SpawnOffset = spawnOffset;
+            EffectId = effectId ?? string.Empty;
+            EffectLocalOffset = effectLocalOffset;
+            SoundId = soundId ?? string.Empty;
+            VolumeScale = volumeScale;
+        }
+
+        public string ActionId { get; }
+
+        public BossActionCommandType CommandType { get; }
+
+        public int TriggerFrame { get; }
+
+        public string AnimationStateName { get; }
+
+        public int CrossFadeFrames { get; }
+
+        public string EnemyDefinitionId { get; }
+
+        public Vector3 SpawnOffset { get; }
+
+        public string EffectId { get; }
+
+        public Vector3 EffectLocalOffset { get; }
+
+        public string SoundId { get; }
+
+        public float VolumeScale { get; }
+    }
+
     public readonly struct BossActiveHitbox
     {
         public BossActiveHitbox(string id, Vector3 offset, float radius, int damage)
@@ -99,23 +151,29 @@ namespace Game.Domain.Battle
     public readonly struct BossBehaviorUpdateResult
     {
         private static readonly IReadOnlyList<EnemyBulletSpawnRequest> EmptyRequests = Array.Empty<EnemyBulletSpawnRequest>();
+        private static readonly IReadOnlyList<BossActionCommandEvent> EmptyCommandEvents = Array.Empty<BossActionCommandEvent>();
 
         public static BossBehaviorUpdateResult Empty => new BossBehaviorUpdateResult(
             EmptyRequests,
+            EmptyCommandEvents,
             BossBehaviorSignal.None,
             BossActionFrameState.Empty);
 
         public BossBehaviorUpdateResult(
             IReadOnlyList<EnemyBulletSpawnRequest> spawnRequests,
+            IReadOnlyList<BossActionCommandEvent> commandEvents,
             BossBehaviorSignal signal,
             BossActionFrameState frameState)
         {
             SpawnRequests = spawnRequests ?? throw new ArgumentNullException(nameof(spawnRequests));
+            CommandEvents = commandEvents ?? EmptyCommandEvents;
             Signal = signal;
             FrameState = frameState;
         }
 
         public IReadOnlyList<EnemyBulletSpawnRequest> SpawnRequests { get; }
+
+        public IReadOnlyList<BossActionCommandEvent> CommandEvents { get; }
 
         public BossBehaviorSignal Signal { get; }
 

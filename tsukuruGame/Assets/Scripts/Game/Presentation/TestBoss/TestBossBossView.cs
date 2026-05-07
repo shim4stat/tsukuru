@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Game.Presentation.TestBoss
 {
-    public sealed class TestBossBossView : MonoBehaviour, ITestBossTintableView, IBossBattleTintableView
+    public sealed class TestBossBossView : MonoBehaviour, ITestBossTintableView, IBossBattleTintableView, IBossBattleAnimatableView
     {
         [SerializeField] private Transform bodyRoot;
         [SerializeField] private GameObject hitboxRoot;
@@ -53,6 +53,17 @@ namespace Game.Presentation.TestBoss
                 if (targets[i] != null)
                     targets[i].color = color;
             }
+        }
+
+        public void PlayAnimation(string stateName, float crossFadeSeconds)
+        {
+            if (animator == null || string.IsNullOrWhiteSpace(stateName))
+                return;
+
+            if (crossFadeSeconds > 0f)
+                animator.CrossFade(stateName, crossFadeSeconds);
+            else
+                animator.Play(stateName);
         }
 
         public void Dispose()

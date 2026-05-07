@@ -33,6 +33,11 @@ namespace Game.Presentation.Game.Boss.Runtime
         private BulletManager _bulletManager;
         private float _playerDamageInvulnerabilityRemaining;
         private bool _isInitialized;
+        private bool _warnedMissingBossAnimator;
+        private bool _warnedSpawnEnemyCommand;
+        private bool _warnedPlayEffectCommand;
+        private bool _warnedPlaySoundCommand;
+        private bool _warnedUnsupportedCommandEvent;
 
         public BossBattleRuntime(
             Transform parent,
@@ -110,6 +115,47 @@ namespace Game.Presentation.Game.Boss.Runtime
             }
 
             UpdatePlayerVisualState();
+        }
+
+        public void HandleBossCommandEvents(IReadOnlyList<BossActionCommandEvent> commandEvents)
+        {
+            if (commandEvents == null || commandEvents.Count == 0)
+                return;
+
+            EnsureInitialized();
+
+            for (int i = 0; i < commandEvents.Count; i++)
+            {
+                BossActionCommandEvent commandEvent = commandEvents[i];
+                switch (commandEvent.CommandType)
+                {
+                    case BossActionCommandType.PlayAnimation:
+                        HandlePlayAnimationCommand(commandEvent);
+                        break;
+                    case BossActionCommandType.SpawnEnemy:
+                        WarnOnce(
+                            ref _warnedSpawnEnemyCommand,
+                            "Boss SpawnEnemy command event was emitted, but enemy spawn runtime is not implemented yet. The command will be ignored.");
+                        break;
+                    case BossActionCommandType.PlayEffect:
+                        WarnOnce(
+                            ref _warnedPlayEffectCommand,
+                            "Boss PlayEffect command event was emitted, but effect playback runtime is not implemented yet. The command will be ignored.");
+                        break;
+                    case BossActionCommandType.PlaySound:
+                        WarnOnce(
+                            ref _warnedPlaySoundCommand,
+                            "Boss PlaySound command event was emitted, but sound playback runtime is not implemented yet. The command will be ignored.");
+                        break;
+                    case BossActionCommandType.SpawnBulletPattern:
+                    case BossActionCommandType.EmitSignal:
+                    default:
+                        WarnOnce(
+                            ref _warnedUnsupportedCommandEvent,
+                            $"Unsupported boss command event reached presentation runtime: {commandEvent.CommandType}");
+                        break;
+                }
+            }
         }
 
         public void Dispose()
@@ -238,6 +284,33 @@ namespace Game.Presentation.Game.Boss.Runtime
 
             _playerDamageInvulnerabilityRemaining = BossBattleRuntimeConstants.PlayerDamageInvulnerabilitySeconds;
             return true;
+        }
+
+        private void HandlePlayAnimationCommand(BossActionCommandEvent commandEvent)
+        {
+            if (string.IsNullOrWhiteSpace(commandEvent.AnimationStateName))
+                return;
+
+            if (_bossView is IBossBattleAnimatableView animatableView)
+            {
+                float crossFadeSeconds = Mathf.Max(0, commandEvent.CrossFadeFrames) /
+                    (float)BossActionTimelineConstants.FramesPerSecond;
+                animatableView.PlayAnimation(commandEvent.AnimationStateName, crossFadeSeconds);
+                return;
+            }
+
+            WarnOnce(
+                ref _warnedMissingBossAnimator,
+                "Boss PlayAnimation command event was emitted, but the active boss view does not support animation. The command will be ignored.");
+        }
+
+        private void WarnOnce(ref bool warned, string message)
+        {
+            if (warned)
+                return;
+
+            warned = true;
+            Debug.LogWarning(message, _root);
         }
 
         private void UpdatePlayerVisualState()

@@ -66,23 +66,22 @@ namespace Game.Domain.Battle
                 throw new ArgumentNullException(nameof(context));
 
             LastActionCompletedThisUpdate = false;
-            EnsureCurrentAction(context);
+            BossActionExecutionResult accumulated = BossActionExecutionResult.Empty;
+            bool hasAccumulated = false;
+            AccumulateTransientResult(EnsureCurrentAction(context), ref accumulated, ref hasAccumulated);
 
             if (deltaTime <= 0f)
-                return SnapshotCurrentAction();
+                return hasAccumulated ? accumulated : SnapshotCurrentAction();
 
             _frameAccumulator += deltaTime * BossActionTimelineConstants.FramesPerSecond;
             int availableFrames = (int)Math.Floor(_frameAccumulator);
             _frameAccumulator -= availableFrames;
             if (availableFrames <= 0)
-                return SnapshotCurrentAction();
-
-            BossActionExecutionResult accumulated = BossActionExecutionResult.Empty;
-            bool hasAccumulated = false;
+                return hasAccumulated ? accumulated : SnapshotCurrentAction();
 
             while (availableFrames > 0)
             {
-                EnsureCurrentAction(context);
+                AccumulateTransientResult(EnsureCurrentAction(context), ref accumulated, ref hasAccumulated);
                 if (_currentAction == null)
                 {
                     CurrentFrameState = BossActionFrameState.Empty;
@@ -146,22 +145,37 @@ namespace Game.Domain.Battle
             return snapshot;
         }
 
-        private void EnsureCurrentAction(BattleContext context)
+        private BossActionExecutionResult EnsureCurrentAction(BattleContext context)
         {
             if (_currentAction != null)
-                return;
+                return BossActionExecutionResult.Empty;
 
             ActionSelectionResult selection = _selector.SelectNext(_plan, _actionHistory, _openingIndex);
             if (string.IsNullOrWhiteSpace(selection.ActionId))
-                return;
+                return BossActionExecutionResult.Empty;
 
             if (!_actionsById.TryGetValue(selection.ActionId, out IBossAction action))
                 throw new InvalidOperationException($"Boss action is not configured. actionId={selection.ActionId}");
 
             _currentAction = action;
-            _currentAction.Enter(context);
+            BossActionExecutionResult enterResult = _currentAction.Enter(context);
+            CurrentFrameState = enterResult.FrameState;
             if (selection.ConsumedOpeningSequence)
                 _openingIndex++;
+
+            return enterResult;
+        }
+
+        private static void AccumulateTransientResult(
+            BossActionExecutionResult result,
+            ref BossActionExecutionResult accumulated,
+            ref bool hasAccumulated)
+        {
+            if (!result.HasTransientOutput)
+                return;
+
+            accumulated = hasAccumulated ? accumulated.Merge(result) : result;
+            hasAccumulated = true;
         }
 
         private void CompleteCurrentAction()

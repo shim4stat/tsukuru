@@ -19,4 +19,9 @@ namespace Game.Presentation.Game.Boss.Runtime
     {
         void SetBodyColor(Color color);
     }
+
+    internal interface IBossBattleAnimatableView : IBossBattleEntityView
+    {
+        void PlayAnimation(string stateName, float crossFadeSeconds);
+    }
 }

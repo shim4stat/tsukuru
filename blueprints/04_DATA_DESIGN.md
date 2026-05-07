@@ -156,29 +156,69 @@
 * `List<int> gaugeMaxHps`（複数ゲージ最大HP）
 * `int baseDropEnergyAmount`
 * `float minDropIntervalSeconds`（要件：0.1秒に1回まで）
-* `float actionIntervalSeconds`（互換用。`phases` 未設定時のフォールバック生成にのみ使用）
-* `List<BossPhaseDefinition> phases`（各ゲージに対応する攻撃パターン定義。`gaugeMaxHps` と同数）
+* `string initialStateId`
+* `List<BossStateDefinition> states`
+* `List<BossActionDefinition> actions`
 
-`BossPhaseDefinition`
+`BossStateDefinition`
+
+* `string id`
+* `BossStateType stateType`（`Intro` / `Phase` / `Dead`）
+* `BossActionPlan actionPlan`
+* `List<BossStateTransition> transitions`
+
+`BossActionPlan`
+
+* `List<string> openingSequenceActionIds`
+* `List<string> randomActionIds`
+* `int historyWindow`
+
+`BossActionDefinition`
+
+* `string id`
+* `string animationStateName`
+* `BossActionEndConditionType endConditionType`
+* `BossActionCancelPolicy cancelPolicy`
+* `int totalDurationFrames`
+* `List<BossActionCommand> commands`
+* `List<BossActionWindow> windows`
+
+`BossActionCommand`
+
+* `int triggerFrame`
+* `BossActionCommandType commandType`
+* command ごとの payload（弾幕、signal、animation、spawn、effect、sound）
+
+`BossActionWindow`
+
+* `string id`
+* `BossActionWindowType windowType`
+* `int startFrameInclusive`
+* `int endFrameExclusive`
+* window ごとの payload（move、hitbox、hurtbox、cancel など）
+
+`BossBulletPatternDefinition`
 
 * `BossAttackPatternType patternType`（`SingleShot` / `NWayShot` / `BurstShot`）
-* `float fireIntervalSeconds`
-* `int shotCount`（`NWayShot` 用）
-* `float spreadDegrees`（`NWayShot` 用）
-* `int burstShotCount`（`BurstShot` 用）
-* `float burstShotIntervalSeconds`（`BurstShot` 用）
+* `int initialDelayFrames`
+* `int fireIntervalFrames`
+* `int shotCount`
+* `float spreadDegrees`
+* `int burstShotCount`
+* `int burstShotIntervalFrames`
 * `float bulletSpeed`
 * `float bulletLifetimeSeconds`
 * `int bulletDamage`
 * `int absorbableEnergyAmount`
-* `EnemyBulletBehaviorType bulletBehaviorType`（現行実運用は `Straight` のみ）
+* `EnemyBulletBehaviorType bulletBehaviorType`（現行実運用は `Straight` が中心）
 * `Vector3 spawnOffset`（Boss位置からの発射原点オフセット）
 * `Vector3 fireDirection`（正規化して使用）
 
 補足：
 
-* 現行実装では `BossActionService` が `BossPhaseDefinition` を参照して `EnemyBulletSpawnRequest` を組み立てる。
-* `phases` が空の場合は `actionIntervalSeconds` を用いた `SingleShot` / `NWayShot` / `BurstShot` のフォールバック生成で互換動作させる。
+* 現行の正規経路は `BossStateMachine` → `BossActionController` → `ConfiguredBossAction` → timeline である。
+* `ActionIntervalSeconds` と `PhasePatterns` は現行 `BossParamsContract` の正規 field ではない。
+* `BossParamsAsset` に残る旧 `actionIntervalSeconds` / `phasePatterns` は、必要に応じて `initialStateId + states + actions` へ migration する。
 
 ### 4.5 AttackSequenceDefinition（攻撃/特殊攻撃シーケンス）
 
@@ -215,7 +255,7 @@
 
 補足：
 
-* 現行のボス弾幕は `BossPhaseDefinition` が弾速・発射方向・挙動種別などの発射設定を直接持つ。
+* 現行のボス弾幕は `BossBulletPatternDefinition` が弾速・発射方向・挙動種別などの発射設定を直接持つ。
 * `EnemyBulletDefinition` は共通弾種を再利用したくなった段階で参照元へ昇格させる拡張枠とする。
 
 ### 4.7 ItemDefinition（アイテム定義）

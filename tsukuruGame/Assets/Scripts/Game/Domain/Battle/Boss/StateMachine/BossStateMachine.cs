@@ -12,12 +12,14 @@ namespace Game.Domain.Battle
     {
         public BossStateUpdateResult(
             IReadOnlyList<EnemyBulletSpawnRequest> spawnRequests,
+            IReadOnlyList<BossActionCommandEvent> commandEvents,
             BossActionFrameState frameState,
             bool hasTransition,
             string nextStateId,
             bool isTerminalCompletion)
         {
             SpawnRequests = spawnRequests ?? Array.Empty<EnemyBulletSpawnRequest>();
+            CommandEvents = commandEvents ?? Array.Empty<BossActionCommandEvent>();
             FrameState = frameState;
             HasTransition = hasTransition;
             NextStateId = nextStateId ?? string.Empty;
@@ -25,6 +27,8 @@ namespace Game.Domain.Battle
         }
 
         public IReadOnlyList<EnemyBulletSpawnRequest> SpawnRequests { get; }
+
+        public IReadOnlyList<BossActionCommandEvent> CommandEvents { get; }
 
         public BossActionFrameState FrameState { get; }
 
@@ -112,7 +116,7 @@ namespace Game.Domain.Battle
                 }
             }
 
-            return new BossBehaviorUpdateResult(stateResult.SpawnRequests, signal, frameState);
+            return new BossBehaviorUpdateResult(stateResult.SpawnRequests, stateResult.CommandEvents, signal, frameState);
         }
 
         public void NotifySignal(string signalId)
@@ -284,8 +288,9 @@ namespace Game.Domain.Battle
 
             bool hasCommands = action.Commands != null && action.Commands.Count > 0;
             bool hasWindows = action.Windows != null && action.Windows.Count > 0;
-            if (!hasCommands && !hasWindows)
-                throw new InvalidOperationException($"Boss action has no commands or windows. actionId={action.Id}");
+            bool hasActionAnimation = !string.IsNullOrWhiteSpace(action.AnimationStateName);
+            if (!hasCommands && !hasWindows && !hasActionAnimation)
+                throw new InvalidOperationException($"Boss action has no commands, windows, or animation. actionId={action.Id}");
             if (action.CancelPolicy == BossActionCancelPolicy.Windowed && !HasWindowType(action.Windows, BossActionWindowType.CancelWindow))
             {
                 throw new InvalidOperationException(
@@ -377,12 +382,52 @@ namespace Game.Domain.Battle
 
                         break;
                     case BossActionCommandType.PlayAnimation:
+                        if (string.IsNullOrWhiteSpace(command.AnimationStateName))
+                        {
+                            throw new InvalidOperationException(
+                                $"PlayAnimation command requires animation state name. actionId={action.Id}, index={i}");
+                        }
+
+                        if (command.CrossFadeFrames < 0)
+                        {
+                            throw new InvalidOperationException(
+                                $"PlayAnimation command cross fade frames must be non-negative. actionId={action.Id}, index={i}, crossFadeFrames={command.CrossFadeFrames}");
+                        }
+
+                        break;
                     case BossActionCommandType.SpawnEnemy:
+                        if (string.IsNullOrWhiteSpace(command.EnemyDefinitionId))
+                        {
+                            throw new InvalidOperationException(
+                                $"SpawnEnemy command requires enemy definition id. actionId={action.Id}, index={i}");
+                        }
+
+                        break;
                     case BossActionCommandType.PlayEffect:
+                        if (string.IsNullOrWhiteSpace(command.EffectId))
+                        {
+                            throw new InvalidOperationException(
+                                $"PlayEffect command requires effect id. actionId={action.Id}, index={i}");
+                        }
+
+                        break;
                     case BossActionCommandType.PlaySound:
+                        if (string.IsNullOrWhiteSpace(command.SoundId))
+                        {
+                            throw new InvalidOperationException(
+                                $"PlaySound command requires sound id. actionId={action.Id}, index={i}");
+                        }
+
+                        if (command.VolumeScale < 0f)
+                        {
+                            throw new InvalidOperationException(
+                                $"PlaySound command volume scale must be non-negative. actionId={action.Id}, index={i}, volumeScale={command.VolumeScale}");
+                        }
+
+                        break;
                     default:
                         throw new InvalidOperationException(
-                            $"Unsupported boss action command type in v1. actionId={action.Id}, index={i}, commandType={command.CommandType}");
+                            $"Unknown boss action command type. actionId={action.Id}, index={i}, commandType={command.CommandType}");
                 }
             }
         }
@@ -543,10 +588,22 @@ namespace Game.Domain.Battle
             IReadOnlyCollection<string> transitionSignals = MergeSignals(pendingSignals, actionResult.EmittedSignals);
             BossStateTransitionContract transition = FindTransition(context, transitionSignals, actionResult);
             if (transition == null)
-                return new BossStateUpdateResult(actionResult.SpawnRequests, actionResult.FrameState, false, string.Empty, false);
+                return new BossStateUpdateResult(
+                    actionResult.SpawnRequests,
+                    actionResult.CommandEvents,
+                    actionResult.FrameState,
+                    false,
+                    string.Empty,
+                    false);
 
             bool isTerminalCompletion = string.IsNullOrWhiteSpace(transition.NextStateId);
-            return new BossStateUpdateResult(actionResult.SpawnRequests, actionResult.FrameState, true, transition.NextStateId, isTerminalCompletion);
+            return new BossStateUpdateResult(
+                actionResult.SpawnRequests,
+                actionResult.CommandEvents,
+                actionResult.FrameState,
+                true,
+                transition.NextStateId,
+                isTerminalCompletion);
         }
 
         public void Exit()

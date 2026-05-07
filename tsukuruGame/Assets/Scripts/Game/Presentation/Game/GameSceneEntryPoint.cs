@@ -439,6 +439,7 @@ namespace Game.Presentation.Game
             BossBehaviorUpdateResult updateResult = _bossStateMachine.Update(_battleContext, deltaTime);
             _battleContext.SetBossActionFrameState(updateResult.FrameState);
             _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, updateResult.SpawnRequests);
+            _bossBattleRuntime?.HandleBossCommandEvents(updateResult.CommandEvents);
             HandleBossBehaviorSignal(updateResult.Signal);
         }
 
