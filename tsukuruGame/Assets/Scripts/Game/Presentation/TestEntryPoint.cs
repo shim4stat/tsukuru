@@ -1,4 +1,6 @@
 ﻿using Game.Domain.Battle;
+using Game.Infrastructure.Battle;
+using Game.Infrastructure.MasterData.Assets;
 using UnityEngine;
 
 namespace Game.Presentation
@@ -7,34 +9,32 @@ namespace Game.Presentation
     {
         [SerializeField] private KeyInputManager keyInputManager;
         [SerializeField] private PlayerController playerController;
+        [SerializeField] private PlayerParamsAsset playerParamsAsset;
 
-        private Domain.Battle.PlayerMoveManager playerMoveManager;
+        private BattleContext battleContext;
 
         void Start()
         {
-            // 仮の初期化コード。実際はBattleContextやStageMapを作成して渡す必要がある。
-            var battleContext = new Domain.Battle.BattleContext();
+            string stageDir = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle");
+            var repository = new StageMapRepository();
+            var stageId = new StageId(1);
+            var factory = new BattleEntityFactory(repository, stageDir);
 
-            string stageJsonPath = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle/stage.json");
-            var repository = new global::Game.Infrastructure.Battle.StageMapRepository();
-            var stageMapDto = repository.LoadStageMap(stageJsonPath);
-            var stageMap = Domain.Battle.StageMap.CreateFromDto(stageMapDto);
+            var playerStaticParams = playerParamsAsset != null
+                ? new PlayerStaticParams(
+                    playerParamsAsset.MaxHp,
+                    playerParamsAsset.WalkSpeed,
+                    playerParamsAsset.DashSpeed,
+                    playerParamsAsset.DashDuration,
+                    playerParamsAsset.DashCooldown,
+                    playerParamsAsset.DashDeceleration)
+                : new PlayerStaticParams(100, 5f, 10f, 0.5f, 2f, 1f);
 
-            // SetupでPlayerを生成してからManagerに渡す
-            battleContext.Setup(new StageId(1), new BattleEntityFactory());
+            battleContext = new BattleContext(factory, playerStaticParams);
+            battleContext.Setup(stageId);
 
-            playerMoveManager = new Domain.Battle.PlayerMoveManager(battleContext, stageMap);
-
-            keyInputManager.Initialize(playerMoveManager);
+            keyInputManager.Initialize(battleContext.Player, battleContext.Robot);
             playerController.Initialize(battleContext.Player);
-        }
-
-        void Update()
-        {
-            if (playerMoveManager != null)
-            {
-                playerMoveManager.Update(Time.deltaTime);
-            }
         }
     }
 }

@@ -4,11 +4,13 @@ using NumericsVector3 = System.Numerics.Vector3;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
+using Game.Infrastructure.Battle;
 using Game.Presentation.Common;
 using Game.Presentation.Game.Boss.Runtime;
 using Game.Presentation.Game.Boss.UI;
 using Game.Presentation.TestBoss.Data;
 using Game.Presentation.TestBoss;
+using Game.Presentation.Game.Battle;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -26,6 +28,8 @@ namespace Game.Presentation.Game
         [SerializeField] private Vector3 bossSpawnPosition = new Vector3(0f, 4f, 0f);
         [SerializeField] private TestBossBossView testBossBossPrefab;
         [SerializeField] private TestBossBulletView testBossBulletPrefab;
+        [SerializeField] private Transform itemParent;
+        [SerializeField] private GameObject itemPrefab;
 
         private enum FlowState
         {
@@ -51,6 +55,7 @@ namespace Game.Presentation.Game
         private BossBattleRuntime _bossBattleRuntime;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
+        private ItemPresenter _itemPresenter;
         private FlowState _flowState = FlowState.Initializing;
         private bool _isInitialized;
         private bool _isExiting;
@@ -119,6 +124,11 @@ namespace Game.Presentation.Game
                 bossTitleOverlayView.Unbind();
             }
 
+            if (_itemPresenter != null)
+            {
+                _itemPresenter.Dispose();
+            }
+
             _battleContext = null;
             _battleEntityFactory = null;
             _battleFlowService = null;
@@ -129,6 +139,7 @@ namespace Game.Presentation.Game
             _bossBattleRuntime = null;
             _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
+            _itemPresenter = null;
             _stage = null;
             _playerParams = null;
             _bossParams = null;
@@ -166,6 +177,7 @@ namespace Game.Presentation.Game
             InitializeGameHud();
             InitializeBossTitleOverlay();
             CreateBattleRuntime();
+            SpawnBattleItems();
 
             if (_stage.HasIntroStory)
             {
@@ -187,15 +199,45 @@ namespace Game.Presentation.Game
         {
             StageId battleStageId = ParseBattleStageId(_session.CurrentStageId);
 
-            _battleEntityFactory = new BattleEntityFactory();
-            _battleContext = new BattleContext();
-            _battleContext.Setup(battleStageId, _battleEntityFactory);
+            string stageDir = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle");
+            var repository = new StageMapRepository();
+            _battleEntityFactory = new BattleEntityFactory(repository, stageDir);
+
+            var playerStaticParams = new PlayerStaticParams(
+                _playerParams.MaxHp,
+                _playerParams.WalkSpeed,
+                _playerParams.DashSpeed,
+                _playerParams.DashDuration,
+                _playerParams.DashCooldown,
+                _playerParams.DashDeceleration);
+
+            _battleContext = new BattleContext(_battleEntityFactory, playerStaticParams);
+            _battleContext.Setup(battleStageId);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
             _bossStateMachine = new BossStateMachine();
             _bossStateMachine.Initialize(_battleContext.Boss, _bossParams);
             _enemyBulletService = new EnemyBulletService();
             InitializeBossBattleRuntimeIfNeeded();
+        }
+
+
+        private void SpawnBattleItems()
+        {
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+
+            if (itemPrefab == null)
+                throw new InvalidOperationException(
+                    "Item prefab is not assigned in GameSceneEntryPoint. " +
+                    "Please assign 'itemPrefab' in the scene (Inspector) for this GameScene.");
+
+            if (itemParent == null)
+                throw new InvalidOperationException(
+                    "Item parent transform is not assigned in GameSceneEntryPoint. " +
+                    "Please assign 'itemParent' in the scene (Inspector) for this GameScene.");
+            _itemPresenter = new ItemPresenter(itemParent, itemPrefab);
+            _itemPresenter.SpawnItems(_battleContext.Items);
         }
 
         private void StartBattleIfNeeded()

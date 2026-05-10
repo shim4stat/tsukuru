@@ -5,29 +5,31 @@ namespace Game.Presentation
 {
     public class KeyInputManager : MonoBehaviour
     {
-        private PlayerMoveManager playerMoveManager;
+        private Player player;
+        private Robot robot;
 
-        public void Initialize(PlayerMoveManager playermovemanager)
+        public void Initialize(Player player, Robot robot)
         {
-            playerMoveManager = playermovemanager;
+            this.player = player;
+            this.robot = robot;
         }
 
         void Update()
         {
-            UnityEngine.Vector2Int inputDir = UnityEngine.Vector2Int.zero;
+            if (player == null) return;
 
-            if (Input.GetKey(KeyCode.W)) inputDir += UnityEngine.Vector2Int.up;
-            if (Input.GetKey(KeyCode.S)) inputDir += UnityEngine.Vector2Int.down;
-            if (Input.GetKey(KeyCode.A)) inputDir += UnityEngine.Vector2Int.left;
-            if (Input.GetKey(KeyCode.D)) inputDir += UnityEngine.Vector2Int.right;
+            Vector2Int inputDir = Vector2Int.zero;
 
-            // Debug.Log($"Input Direction: {inputDir}");
+            if (Input.GetKey(KeyCode.W)) inputDir += Vector2Int.up;
+            if (Input.GetKey(KeyCode.S)) inputDir += Vector2Int.down;
+            if (Input.GetKey(KeyCode.A)) inputDir += Vector2Int.left;
+            if (Input.GetKey(KeyCode.D)) inputDir += Vector2Int.right;
 
-            playerMoveManager.SetInputDirection((inputDir.x, inputDir.y));
+            player.Move(new System.Numerics.Vector2(inputDir.x, inputDir.y), robot, Time.deltaTime);
 
             if (Input.GetKeyDown(KeyCode.Space))
             {
-                playerMoveManager.SetInputDash();
+                player.InputDash();
             }
         }
     }
