@@ -225,6 +225,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Game.Presentation::Game.Presentation.Game.GameSceneEntryPoint
   gameHudView: {fileID: 1926438451}
   bossTitleOverlayView: {fileID: 1022643448}
+  bossSpawnPosition: {x: 0, y: 4, z: 0}
+  testBossBossPrefab: {fileID: 0}
+  testBossBulletPrefab: {fileID: 0}
 --- !u!4 &430493351
 Transform:
   m_ObjectHideFlags: 0

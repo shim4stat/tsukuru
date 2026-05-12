@@ -156,13 +156,73 @@
 * `List<int> gaugeMaxHps`（複数ゲージ最大HP）
 * `int baseDropEnergyAmount`
 * `float minDropIntervalSeconds`（要件：0.1秒に1回まで）
-* （任意）`List<BossPhaseDefinition> phases`（攻撃パターン参照。詳細未確定のため拡張枠として確保）
+* `string initialStateId`
+* `List<BossStateDefinition> states`
+* `List<BossActionDefinition> actions`
 
-`BossPhaseDefinition`（拡張枠）
+`BossStateDefinition`
 
-* `string phaseId`
-* `string enemySpawnPatternId`（雑魚召喚パターン）
-* `string bulletPatternId`（弾幕パターン）
+* `string id`
+* `BossStateType stateType`（`Intro` / `Phase` / `Dead`）
+* `BossActionPlan actionPlan`
+* `List<BossStateTransition> transitions`
+
+`BossActionPlan`
+
+* `List<string> openingSequenceActionIds`
+* `List<string> randomActionIds`
+* `int historyWindow`
+
+`BossActionDefinition`
+
+* `string id`
+* `string actionTypeId`（C# action class / registry key）
+* `string animationStateName`
+* `BossActionEndConditionType endConditionType`
+* `BossActionCancelPolicy cancelPolicy`
+* `int totalDurationFrames`
+* `string configKey` または action ごとの専用 config
+* （互換）`List<BossActionCommand> commands`
+* （互換）`List<BossActionWindow> windows`
+
+`BossActionCommand`
+
+* `int triggerFrame`
+* `BossActionCommandType commandType`
+* legacy timeline 用 payload（弾幕、signal、animation、spawn、effect、sound）
+
+`BossActionWindow`
+
+* `string id`
+* `BossActionWindowType windowType`
+* `int startFrameInclusive`
+* `int endFrameExclusive`
+* legacy timeline 用 payload（move、hitbox、hurtbox、cancel など）
+
+`BossBulletPatternDefinition`
+
+* `BossAttackPatternType patternType`（`SingleShot` / `NWayShot` / `BurstShot`）
+* `int initialDelayFrames`
+* `int fireIntervalFrames`
+* `int shotCount`
+* `float spreadDegrees`
+* `int burstShotCount`
+* `int burstShotIntervalFrames`
+* `float bulletSpeed`
+* `float bulletLifetimeSeconds`
+* `int bulletDamage`
+* `int absorbableEnergyAmount`
+* `EnemyBulletBehaviorType bulletBehaviorType`（現行実運用は `Straight` が中心）
+* `Vector3 spawnOffset`（Boss位置からの発射原点オフセット）
+* `Vector3 fireDirection`（正規化して使用）
+
+補足：
+
+* 今後の正規経路は `BossStateMachine` → `BossActionController` → `BossActionFactory/Registry` → C# 専用 action である。
+* `BossActionDefinition` は C# action 参照/登録メタデータとして扱い、実行内容そのものは action class 側に書く。
+* `commands` / `windows` は現行実装に残る legacy timeline 互換 payload であり、新規の複雑なボス行動の正規入力ではない。
+* `ActionIntervalSeconds` と `PhasePatterns` は現行 `BossParamsContract` の正規 field ではない。
+* `BossParamsAsset` に残る旧 `actionIntervalSeconds` / `phasePatterns` は、必要に応じて `initialStateId + states + actions` へ migration する。
 
 ### 4.5 AttackSequenceDefinition（攻撃/特殊攻撃シーケンス）
 
@@ -178,7 +238,7 @@
 * `string robotBulletId`（生成するBullet種別）
 * `float dropMultiplier`（要件：攻撃によってドロップ倍率変動）
 
-### 4.6 RobotBulletDefinition / EnemyBulletDefinition（弾定義）
+### 4.6 RobotBulletDefinition / EnemyBulletDefinition（弾定義 / 共通弾種）
 
 `RobotBulletDefinition`
 
@@ -196,6 +256,11 @@
 * `float lifetimeSeconds`
 * `int absorbableEnergyAmount`（ダッシュ吸収で得られる）
 * （表示側のみ）`GameObject prefab`
+
+補足：
+
+* 現行のボス弾幕は `BossBulletPatternDefinition` が弾速・発射方向・挙動種別などの発射設定を直接持つ。
+* `EnemyBulletDefinition` は共通弾種を再利用したくなった段階で参照元へ昇格させる拡張枠とする。
 
 ### 4.7 ItemDefinition（アイテム定義）
 
