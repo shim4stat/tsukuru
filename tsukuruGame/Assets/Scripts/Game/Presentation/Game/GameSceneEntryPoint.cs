@@ -1,9 +1,15 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
+using NumericsVector3 = System.Numerics.Vector3;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
 using Game.Infrastructure.Battle;
 using Game.Presentation.Common;
+using Game.Presentation.Game.Boss.Runtime;
+using Game.Presentation.Game.Boss.UI;
+using Game.Presentation.TestBoss.Data;
+using Game.Presentation.TestBoss;
 using Game.Presentation.Game.Battle;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -19,6 +25,9 @@ namespace Game.Presentation.Game
 
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
+        [SerializeField] private Vector3 bossSpawnPosition = new Vector3(0f, 4f, 0f);
+        [SerializeField] private TestBossBossView testBossBossPrefab;
+        [SerializeField] private TestBossBulletView testBossBulletPrefab;
         [SerializeField] private Transform itemParent;
         [SerializeField] private GameObject itemPrefab;
 
@@ -38,8 +47,12 @@ namespace Game.Presentation.Game
         private PlayerParamsContract _playerParams;
         private BossParamsContract _bossParams;
         private BattleContext _battleContext;
+        private BattleEntityFactory _battleEntityFactory;
         private BattleFlowService _battleFlowService;
+        private BossStateMachine _bossStateMachine;
         private BossDamageService _bossDamageService;
+        private EnemyBulletService _enemyBulletService;
+        private BossBattleRuntime _bossBattleRuntime;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private ItemPresenter _itemPresenter;
@@ -117,8 +130,13 @@ namespace Game.Presentation.Game
             }
 
             _battleContext = null;
+            _battleEntityFactory = null;
             _battleFlowService = null;
+            _bossStateMachine = null;
             _bossDamageService = null;
+            _enemyBulletService = null;
+            _bossBattleRuntime?.Dispose();
+            _bossBattleRuntime = null;
             _gameHudPresenter = null;
             _bossTitleOverlayPresenter = null;
             _itemPresenter = null;
@@ -183,7 +201,7 @@ namespace Game.Presentation.Game
 
             string stageDir = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Scripts/Game/Domain/Battle");
             var repository = new StageMapRepository();
-            var factory = new BattleEntityFactory(repository, stageDir);
+            _battleEntityFactory = new BattleEntityFactory(repository, stageDir);
 
             var playerStaticParams = new PlayerStaticParams(
                 _playerParams.MaxHp,
@@ -193,11 +211,16 @@ namespace Game.Presentation.Game
                 _playerParams.DashCooldown,
                 _playerParams.DashDeceleration);
 
-            _battleContext = new BattleContext(factory, playerStaticParams);
+            _battleContext = new BattleContext(_battleEntityFactory, playerStaticParams);
             _battleContext.Setup(battleStageId);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
+            _bossStateMachine = new BossStateMachine();
+            _bossStateMachine.Initialize(_battleContext.Boss, _bossParams);
+            _enemyBulletService = new EnemyBulletService();
+            InitializeBossBattleRuntimeIfNeeded();
         }
+
 
         private void SpawnBattleItems()
         {
@@ -247,17 +270,29 @@ namespace Game.Presentation.Game
             if (_battleContext == null || _battleFlowService == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
-            RenderGameHud();
+            _bossBattleRuntime?.TickBeforeBattleSimulation(Time.deltaTime);
             _battleFlowService.Update(_battleContext, _session, Time.deltaTime);
 
             if (_battleContext.Phase == BattlePhase.BossBoot)
             {
+                _bossBattleRuntime?.TickAfterBattleSimulation();
+                RenderGameHud();
                 HandleBossBoot();
+                UpdateBossBehavior(Time.deltaTime);
                 return;
             }
 
             _bossTitleOverlayPresenter?.ForceHide();
             HandleDebugBossDamageInput();
+
+            if (_battleContext.Phase == BattlePhase.Combat)
+            {
+                UpdateCombatEnemyBullets(Time.deltaTime);
+                UpdateBossBehavior(Time.deltaTime);
+            }
+
+            _bossBattleRuntime?.TickAfterBattleSimulation();
+            RenderGameHud();
 
             if (_battleContext.Phase == BattlePhase.BossDefeated)
             {
@@ -344,6 +379,10 @@ namespace Game.Presentation.Game
                 throw new InvalidOperationException("Stage master data is not initialized.");
             if (string.IsNullOrWhiteSpace(_stage.Id))
                 throw new InvalidOperationException("StageDefinition.Id is null or empty.");
+
+            if (TestBossParamsResolver.TryResolve(_stage.Id, out BossParamsContract testBossParams))
+                return testBossParams;
+
             if (string.IsNullOrWhiteSpace(_stage.BossId))
                 throw new InvalidOperationException($"StageDefinition.BossId is null or empty. stageId={_stage.Id}");
 
@@ -360,6 +399,38 @@ namespace Game.Presentation.Game
                 throw new InvalidOperationException("Boss master data is not initialized.");
 
             _battleContext.Boss.Initialize(_bossParams);
+            _battleContext.Boss.SetPosition(ToNumericsVector3(bossSpawnPosition));
+        }
+
+        private void InitializeBossBattleRuntimeIfNeeded()
+        {
+            if (_stage == null || !TestBossSelector.ShouldUseForStage(_stage.Id))
+                return;
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_playerParams == null)
+                throw new InvalidOperationException("Player master data is not initialized.");
+            if (_enemyBulletService == null)
+                throw new InvalidOperationException("EnemyBulletService is not initialized.");
+
+            bool hasBossPrefab = testBossBossPrefab != null;
+            bool hasBulletPrefab = testBossBulletPrefab != null;
+            if (hasBossPrefab != hasBulletPrefab)
+            {
+                Debug.LogWarning(
+                    "Test boss prefab setup is incomplete. Falling back to runtime debug visuals. " +
+                    $"bossPrefabAssigned={hasBossPrefab}, bulletPrefabAssigned={hasBulletPrefab}",
+                    this);
+            }
+
+            _bossBattleRuntime = new BossBattleRuntime(
+                transform,
+                _battleContext,
+                _playerParams,
+                _enemyBulletService,
+                testBossBossPrefab,
+                testBossBulletPrefab);
+            _bossBattleRuntime.Initialize();
         }
 
         private void InitializeGameHud()
@@ -386,6 +457,34 @@ namespace Game.Presentation.Game
             _gameHudPresenter?.Hide();
         }
 
+        private void UpdateCombatEnemyBullets(float deltaTime)
+        {
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_enemyBulletService == null)
+                throw new InvalidOperationException("EnemyBulletService is not initialized.");
+
+            _enemyBulletService.Update(_battleContext, deltaTime);
+        }
+
+        private void UpdateBossBehavior(float deltaTime)
+        {
+            if (_battleContext == null)
+                throw new InvalidOperationException("BattleContext is not initialized.");
+            if (_battleEntityFactory == null)
+                throw new InvalidOperationException("BattleEntityFactory is not initialized.");
+            if (_bossStateMachine == null)
+                throw new InvalidOperationException("BossStateMachine is not initialized.");
+            if (_enemyBulletService == null)
+                throw new InvalidOperationException("EnemyBulletService is not initialized.");
+
+            BossBehaviorUpdateResult updateResult = _bossStateMachine.Update(_battleContext, deltaTime);
+            _battleContext.SetBossActionFrameState(updateResult.FrameState);
+            _enemyBulletService.Spawn(_battleContext, _battleEntityFactory, updateResult.SpawnRequests);
+            _bossBattleRuntime?.HandleBossCommandEvents(updateResult.CommandEvents);
+            HandleBossBehaviorSignal(updateResult.Signal);
+        }
+
         private void HandleDebugBossDamageInput()
         {
 #if UNITY_EDITOR
@@ -394,10 +493,10 @@ namespace Game.Presentation.Game
 
             if (_bossDamageService == null)
                 throw new InvalidOperationException("BossDamageService is not initialized.");
-            if (_battleContext == null || _battleFlowService == null || _session == null)
+            if (_battleContext == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
-            _bossDamageService.ApplyBossDamage(_battleContext, _session, _battleFlowService, 1);
+            _bossDamageService.ApplyBossDamage(_battleContext, 1);
 #endif
         }
 
@@ -412,13 +511,36 @@ namespace Game.Presentation.Game
 
         private void OnBossTitleOverlayFinished()
         {
-            if (_battleContext == null || _battleFlowService == null || _session == null)
+            if (_battleContext == null || _bossStateMachine == null)
                 throw new InvalidOperationException("Battle runtime is not initialized.");
 
             if (_battleContext.Phase != BattlePhase.BossBoot)
                 return;
 
-            _battleFlowService.OnBossBootFinished(_battleContext, _session);
+            _bossStateMachine.NotifySignal(BossStateSignalIds.IntroFinished);
+        }
+
+        private void HandleBossBehaviorSignal(BossBehaviorSignal signal)
+        {
+            if (signal == BossBehaviorSignal.None)
+                return;
+            if (_battleContext == null || _battleFlowService == null || _session == null)
+                throw new InvalidOperationException("Battle runtime is not initialized.");
+
+            switch (signal)
+            {
+                case BossBehaviorSignal.IntroCompleted:
+                    if (_battleContext.Phase == BattlePhase.BossBoot)
+                        _battleFlowService.OnBossBootFinished(_battleContext, _session);
+                    break;
+                case BossBehaviorSignal.DeadCompleted:
+                    if (_battleContext.Phase == BattlePhase.Combat)
+                        _battleFlowService.OnCombatBossHpZero(_battleContext, _session);
+                    break;
+                case BossBehaviorSignal.None:
+                default:
+                    break;
+            }
         }
 
         private string ResolveBossTitleText()
@@ -444,8 +566,14 @@ namespace Game.Presentation.Game
             int playerHpMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxHp : 1);
             int playerEnergyMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxEnergy : 1);
 
-            // 暫定値: Domain側の自機HP/エネルギー実装前は MasterData と固定値でHUDを成立させる。
-            int playerHpCurrent = playerHpMax;
+            if (_battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats)
+            {
+                playerHpMax = Mathf.Max(1, _battleContext.Player.MaxHp);
+            }
+
+            int playerHpCurrent = _battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats
+                ? Mathf.Clamp(_battleContext.Player.CurrentHp, 0, playerHpMax)
+                : playerHpMax;
             int playerEnergyCurrent = 0;
             bool showBossGauge = _battleContext != null && _battleContext.Boss != null;
             float bossHpNormalized = showBossGauge ? _battleContext.Boss.GetCurrentGaugeHpNormalized() : 0f;
@@ -484,6 +612,11 @@ namespace Game.Presentation.Game
 
             // 暫定対応: stage_01 の末尾数値を Domain.StageId(int) に変換する。
             return new StageId(numericId);
+        }
+
+        private static NumericsVector3 ToNumericsVector3(Vector3 source)
+        {
+            return new NumericsVector3(source.x, source.y, source.z);
         }
     }
 }
