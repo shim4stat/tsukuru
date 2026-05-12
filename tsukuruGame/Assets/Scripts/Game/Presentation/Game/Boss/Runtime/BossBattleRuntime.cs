@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using NumericsVector2 = System.Numerics.Vector2;
 using NumericsVector3 = System.Numerics.Vector3;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Presentation.TestBoss.Data;
-using Game.Presentation.TestBoss.Stage;
 using Game.Presentation.TestBoss;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -62,13 +62,15 @@ namespace Game.Presentation.Game.Boss.Runtime
                 throw new InvalidOperationException("BattleContext.Player is not initialized.");
             if (_context.Boss == null)
                 throw new InvalidOperationException("BattleContext.Boss is not initialized.");
+            if (_context.Robot == null)
+                throw new InvalidOperationException("BattleContext.Robot is not initialized.");
 
             _root = new GameObject("BossBattleRuntime");
             if (_parent != null)
                 _root.transform.SetParent(_parent, false);
 
             _context.Player.InitializeStats(Mathf.Max(1, _playerParams.MaxHp));
-            _playerMoveManager = new PlayerMoveManager(_context, TestBossStageMapLoader.LoadDefault());
+            _playerMoveManager = new PlayerMoveManager(_context.Player);
 
             _playerView = CreateFallbackPlayerView();
             _bossView = CreateBossView();
@@ -96,7 +98,7 @@ namespace Game.Presentation.Game.Boss.Runtime
             if (_context.Player.IsAlive())
                 ApplyInput();
 
-            _playerMoveManager.Update(deltaTime);
+            _playerMoveManager.Update(_context.Robot, deltaTime);
         }
 
         public void TickAfterBattleSimulation()
@@ -184,7 +186,7 @@ namespace Game.Presentation.Game.Boss.Runtime
             if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
                 inputDirection += Vector2Int.right;
 
-            _playerMoveManager.SetInputDirection((inputDirection.x, inputDirection.y));
+            _playerMoveManager.SetInputDirection(new NumericsVector2(inputDirection.x, inputDirection.y));
 
             if (keyboard.spaceKey.wasPressedThisFrame)
                 _playerMoveManager.SetInputDash();
