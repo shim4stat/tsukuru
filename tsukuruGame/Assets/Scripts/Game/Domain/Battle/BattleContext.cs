@@ -15,6 +15,7 @@ namespace Game.Domain.Battle
         public List<RobotBullet> RobotBullets { get; private set; } = new List<RobotBullet>();
         public List<EnemyBullet> EnemyBullets { get; private set; } = new List<EnemyBullet>();
         public List<ItemInstance> Items { get; private set; } = new List<ItemInstance>();
+        public BossActionFrameState BossActionFrameState { get; private set; } = BossActionFrameState.Empty;
 
         public BattleContext(IBattleEntityFactory factory, PlayerStaticParams playerStaticParams)
         {
@@ -37,6 +38,7 @@ namespace Game.Domain.Battle
             RobotBullets = new List<RobotBullet>();
             EnemyBullets = new List<EnemyBullet>();
             Items = new List<ItemInstance>(Robot.Items);
+            BossActionFrameState = BossActionFrameState.Empty;
         }
 
         public void ResetForRetry()
@@ -48,8 +50,14 @@ namespace Game.Domain.Battle
             RobotBullets.Clear();
             EnemyBullets.Clear();
             Items = new List<ItemInstance>(Robot.Items);
+            BossActionFrameState = BossActionFrameState.Empty;
 
             // TODO: Reset Player and Boss state
+        }
+
+        public void SetBossActionFrameState(BossActionFrameState frameState)
+        {
+            BossActionFrameState = frameState;
         }
     }
 }

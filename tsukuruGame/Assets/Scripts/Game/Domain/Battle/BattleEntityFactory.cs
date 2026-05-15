@@ -65,5 +65,10 @@ namespace Game.Domain.Battle
         {
             return new Enemy();
         }
+
+        public EnemyBullet CreateEnemyBullet()
+        {
+            return new EnemyBullet();
+        }
     }
 }

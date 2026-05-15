@@ -13,6 +13,24 @@ MonoBehaviour:
   m_Name: SampleBossParams
   m_EditorClassIdentifier: Game.Infrastructure::Game.Infrastructure.MasterData.Assets.BossParamsAsset
   id: boss_01
-  gaugeMaxHps: 64000000
+  gaugeMaxHps: 1e00000014000000
   baseDropEnergyAmount: 100
   minDropIntervalSeconds: 100
+  actionIntervalSeconds: 16
+  initialStateId: 
+  states: []
+  actions: []
+  phasePatterns:
+  - patternType: 0
+    fireIntervalSeconds: 0
+    shotCount: 0
+    spreadDegrees: 0
+    burstShotCount: 0
+    burstShotIntervalSeconds: 0
+    bulletSpeed: 0
+    bulletLifetimeSeconds: 0
+    bulletDamage: 0
+    absorbableEnergyAmount: 0
+    bulletBehaviorType: 0
+    spawnOffset: {x: 0, y: 0, z: 0}
+    fireDirection: {x: 0, y: 0, z: 0}

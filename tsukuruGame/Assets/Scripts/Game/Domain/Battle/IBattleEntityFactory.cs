@@ -6,5 +6,6 @@
         Robot CreateRobot(StageId stageId);
         Boss CreateBoss();
         Enemy CreateEnemy();
+        EnemyBullet CreateEnemyBullet();
     }
 }

@@ -17,6 +17,7 @@
 
 ### クラス責務やドメイン構造を確認したい
 - 03_DOMAIN_MODEL.md
+- 08_BOSS_BULLET_DESIGN.md（ボスPrefab構造、弾幕詳細、吸収/弾消し連携）
 - 10_GLOSSARY.md（用語）
 
 ### 実装の進め方（順序/タスク分解）
@@ -33,6 +34,7 @@
 - 05_STATE_FLOW.md（= 状態遷移・フロー設計書）
 - 06_UI_SCREEN_FLOW.md（= UI・画面フロー設計）
 - 07_IMPLEMENTATION_PLAN.md（= 実装計画書）
+- 08_BOSS_BULLET_DESIGN.md（= ボス・弾幕詳細設計書）
 - 10_GLOSSARY.md（=用語集）
 
 
