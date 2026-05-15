@@ -579,6 +579,7 @@ namespace Game.Presentation.Game
                 : 0;
             if (_battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats)
             {
+                playerHpCurrent = _battleContext.Player.CurrentHp;
                 playerHpMax = Mathf.Max(1, _battleContext.Player.MaxHp);
             }
 
