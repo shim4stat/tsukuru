@@ -579,13 +579,10 @@ namespace Game.Presentation.Game
                 : 0;
             if (_battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats)
             {
+                playerHpCurrent = _battleContext.Player.CurrentHp;
                 playerHpMax = Mathf.Max(1, _battleContext.Player.MaxHp);
             }
 
-            int playerHpCurrent = _battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats
-                ? Mathf.Clamp(_battleContext.Player.CurrentHp, 0, playerHpMax)
-                : playerHpMax;
-            int playerEnergyCurrent = 0;
             bool showBossGauge = _battleContext != null && _battleContext.Boss != null;
             float bossHpNormalized = showBossGauge ? _battleContext.Boss.GetCurrentGaugeHpNormalized() : 0f;
 
