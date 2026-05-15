@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using Game.Contracts.MasterData.Models;
 using Game.Domain.Battle;
 using Game.Domain.GameSession;
@@ -6,6 +7,7 @@ using Game.Infrastructure.Battle;
 using Game.Presentation.Common;
 using Game.Presentation.Game.Battle;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.InputSystem;
 
 namespace Game.Presentation.Game
@@ -20,7 +22,8 @@ namespace Game.Presentation.Game
         [SerializeField] private GameHudView gameHudView;
         [SerializeField] private BossTitleOverlayView bossTitleOverlayView;
         [SerializeField] private Transform itemParent;
-        [SerializeField] private GameObject itemPrefab;
+        [SerializeField] private GameObject healthPotionPrefab;
+        [SerializeField, FormerlySerializedAs("itemPrefab")] private GameObject energyPotionPrefab;
 
         private enum FlowState
         {
@@ -40,6 +43,7 @@ namespace Game.Presentation.Game
         private BattleContext _battleContext;
         private BattleFlowService _battleFlowService;
         private BossDamageService _bossDamageService;
+        private EnergyPickupService _energyPickupService;
         private GameHudPresenter _gameHudPresenter;
         private BossTitleOverlayPresenter _bossTitleOverlayPresenter;
         private ItemPresenter _itemPresenter;
@@ -187,6 +191,7 @@ namespace Game.Presentation.Game
 
             var playerStaticParams = new PlayerStaticParams(
                 _playerParams.MaxHp,
+                _playerParams.MaxEnergy,
                 _playerParams.WalkSpeed,
                 _playerParams.DashSpeed,
                 _playerParams.DashDuration,
@@ -197,6 +202,7 @@ namespace Game.Presentation.Game
             _battleContext.Setup(battleStageId);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
+            _energyPickupService = new EnergyPickupService();
         }
 
         private void SpawnBattleItems()
@@ -204,16 +210,17 @@ namespace Game.Presentation.Game
             if (_battleContext == null)
                 throw new InvalidOperationException("BattleContext is not initialized.");
 
-            if (itemPrefab == null)
-                throw new InvalidOperationException(
-                    "Item prefab is not assigned in GameSceneEntryPoint. " +
-                    "Please assign 'itemPrefab' in the scene (Inspector) for this GameScene.");
-
             if (itemParent == null)
                 throw new InvalidOperationException(
                     "Item parent transform is not assigned in GameSceneEntryPoint. " +
                     "Please assign 'itemParent' in the scene (Inspector) for this GameScene.");
-            _itemPresenter = new ItemPresenter(itemParent, itemPrefab);
+
+            var prefabMap = new Dictionary<ItemType, GameObject>
+            {
+                { ItemType.HealthPotion, healthPotionPrefab },
+                { ItemType.EnergyPotion, energyPotionPrefab },
+            };
+            _itemPresenter = new ItemPresenter(itemParent, prefabMap, _energyPickupService, _battleContext);
             _itemPresenter.SpawnItems(_battleContext.Items);
         }
 
@@ -444,9 +451,11 @@ namespace Game.Presentation.Game
             int playerHpMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxHp : 1);
             int playerEnergyMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxEnergy : 1);
 
-            // 暫定値: Domain側の自機HP/エネルギー実装前は MasterData と固定値でHUDを成立させる。
+            // 暫定値: Domain側の自機HP実装前は MasterData の固定値でHUDを成立させる。
             int playerHpCurrent = playerHpMax;
-            int playerEnergyCurrent = 0;
+            int playerEnergyCurrent = _battleContext != null && _battleContext.Player != null
+                ? _battleContext.Player.CurrentEnergy
+                : 0;
             bool showBossGauge = _battleContext != null && _battleContext.Boss != null;
             float bossHpNormalized = showBossGauge ? _battleContext.Boss.GetCurrentGaugeHpNormalized() : 0f;
 
