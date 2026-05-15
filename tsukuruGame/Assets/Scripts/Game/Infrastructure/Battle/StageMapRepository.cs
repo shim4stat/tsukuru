@@ -74,7 +74,9 @@ namespace Game.Infrastructure.Battle
                         {
                             CellX = item.X,
                             CellY = item.Y,
-                            ItemType = item.Type
+                            ItemType = item.Type,
+                            BaseEnergyAmount = item.BaseEnergyAmount,
+                            MergedCount = item.MergedCount
                         });
                     }
                 }
@@ -114,6 +116,12 @@ namespace Game.Infrastructure.Battle
 
             [JsonProperty("type")]
             public int Type { get; set; }
+
+            [JsonProperty("baseEnergyAmount")]
+            public int BaseEnergyAmount { get; set; }
+
+            [JsonProperty("mergedCount")]
+            public int MergedCount { get; set; }
         }
     }
 }

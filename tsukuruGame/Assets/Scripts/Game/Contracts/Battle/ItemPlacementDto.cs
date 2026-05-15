@@ -5,5 +5,7 @@ namespace Game.Contracts.Battle
         public int CellX { get; set; }
         public int CellY { get; set; }
         public int ItemType { get; set; }
+        public int BaseEnergyAmount { get; set; }
+        public int MergedCount { get; set; }
     }
 }

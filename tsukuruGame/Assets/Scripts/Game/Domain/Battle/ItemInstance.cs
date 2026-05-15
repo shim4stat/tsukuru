@@ -4,13 +4,21 @@ namespace Game.Domain.Battle
     {
         public int CellX { get; }
         public int CellY { get; }
-        public ItemType ItemType { get; }
+        public ItemDefinition Definition { get; }
+        public int MergedCount { get; }
+        public ItemType ItemType => Definition.ItemType;
 
         public ItemInstance(int cellX, int cellY, ItemType itemType)
+            : this(cellX, cellY, new ItemDefinition(itemType), 1)
+        {
+        }
+
+        public ItemInstance(int cellX, int cellY, ItemDefinition definition, int mergedCount)
         {
             CellX = cellX;
             CellY = cellY;
-            ItemType = itemType;
+            Definition = definition;
+            MergedCount = mergedCount > 0 ? mergedCount : 1;
         }
     }
 }

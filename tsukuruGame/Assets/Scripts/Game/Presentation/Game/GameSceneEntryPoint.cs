@@ -12,6 +12,7 @@ using Game.Presentation.TestBoss.Data;
 using Game.Presentation.TestBoss;
 using Game.Presentation.Game.Battle;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.InputSystem;
 
 namespace Game.Presentation.Game
@@ -29,7 +30,8 @@ namespace Game.Presentation.Game
         [SerializeField] private TestBossBossView testBossBossPrefab;
         [SerializeField] private TestBossBulletView testBossBulletPrefab;
         [SerializeField] private Transform itemParent;
-        [SerializeField] private GameObject itemPrefab;
+        [SerializeField] private GameObject healthPotionPrefab;
+        [SerializeField, FormerlySerializedAs("itemPrefab")] private GameObject energyPotionPrefab;
 
         private enum FlowState
         {
@@ -51,6 +53,7 @@ namespace Game.Presentation.Game
         private BattleFlowService _battleFlowService;
         private BossStateMachine _bossStateMachine;
         private BossDamageService _bossDamageService;
+        private EnergyPickupService _energyPickupService;
         private EnemyBulletService _enemyBulletService;
         private BossBattleRuntime _bossBattleRuntime;
         private GameHudPresenter _gameHudPresenter;
@@ -205,6 +208,7 @@ namespace Game.Presentation.Game
 
             var playerStaticParams = new PlayerStaticParams(
                 _playerParams.MaxHp,
+                _playerParams.MaxEnergy,
                 _playerParams.WalkSpeed,
                 _playerParams.DashSpeed,
                 _playerParams.DashDuration,
@@ -215,6 +219,7 @@ namespace Game.Presentation.Game
             _battleContext.Setup(battleStageId);
             InitializeBossRuntime();
             _battleFlowService = new BattleFlowService();
+            _energyPickupService = new EnergyPickupService();
             _bossStateMachine = new BossStateMachine();
             _bossStateMachine.Initialize(_battleContext.Boss, _bossParams);
             _enemyBulletService = new EnemyBulletService();
@@ -227,16 +232,17 @@ namespace Game.Presentation.Game
             if (_battleContext == null)
                 throw new InvalidOperationException("BattleContext is not initialized.");
 
-            if (itemPrefab == null)
-                throw new InvalidOperationException(
-                    "Item prefab is not assigned in GameSceneEntryPoint. " +
-                    "Please assign 'itemPrefab' in the scene (Inspector) for this GameScene.");
-
             if (itemParent == null)
                 throw new InvalidOperationException(
                     "Item parent transform is not assigned in GameSceneEntryPoint. " +
                     "Please assign 'itemParent' in the scene (Inspector) for this GameScene.");
-            _itemPresenter = new ItemPresenter(itemParent, itemPrefab);
+
+            var prefabMap = new Dictionary<ItemType, GameObject>
+            {
+                { ItemType.HealthPotion, healthPotionPrefab },
+                { ItemType.EnergyPotion, energyPotionPrefab },
+            };
+            _itemPresenter = new ItemPresenter(itemParent, prefabMap, _energyPickupService, _battleContext);
             _itemPresenter.SpawnItems(_battleContext.Items);
         }
 
@@ -566,6 +572,11 @@ namespace Game.Presentation.Game
             int playerHpMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxHp : 1);
             int playerEnergyMax = Mathf.Max(1, _playerParams != null ? _playerParams.MaxEnergy : 1);
 
+            // 暫定値: Domain側の自機HP実装前は MasterData の固定値でHUDを成立させる。
+            int playerHpCurrent = playerHpMax;
+            int playerEnergyCurrent = _battleContext != null && _battleContext.Player != null
+                ? _battleContext.Player.CurrentEnergy
+                : 0;
             if (_battleContext != null && _battleContext.Player != null && _battleContext.Player.HasInitializedStats)
             {
                 playerHpMax = Mathf.Max(1, _battleContext.Player.MaxHp);

@@ -47,7 +47,8 @@ namespace Game.Domain.Battle
                     if (!Enum.IsDefined(typeof(ItemType), placement.ItemType))
                         throw new ArgumentException($"Unknown ItemType value: {placement.ItemType}", nameof(placement.ItemType));
                     var itemType = (ItemType)placement.ItemType;
-                    itemInstances.Add(new ItemInstance(placement.CellX, placement.CellY, itemType));
+                    var definition = new ItemDefinition(itemType, placement.BaseEnergyAmount);
+                    itemInstances.Add(new ItemInstance(placement.CellX, placement.CellY, definition, placement.MergedCount));
                 }
                 robot.PlaceItems(itemInstances);
             }

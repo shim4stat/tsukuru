@@ -6,6 +6,7 @@ namespace Game.Domain.Battle
     {
         // Default values are for debugging
         private readonly int _maxHp;
+        private readonly int _maxEnergy;
         private readonly float _walkSpeed;
         private readonly float _dashSpeed;
         private readonly float _dashDuration;
@@ -14,6 +15,7 @@ namespace Game.Domain.Battle
         private readonly Vector2 _initialPosition;
 
         public int MaxHp => _maxHp;
+        public int MaxEnergy => _maxEnergy;
         public float WalkSpeed => _walkSpeed;
         public float DashSpeed => _dashSpeed;
         public float DashDuration => _dashDuration;
@@ -23,20 +25,27 @@ namespace Game.Domain.Battle
 
         // Parameterless constructor keeps the original debug defaults.
         public PlayerStaticParams()
-            : this(100, 5f, 10f, 0.5f, 2f, 0f, new Vector2(1, 1))
+            : this(100, 100, 5f, 10f, 0.5f, 2f, 0f, new Vector2(1, 1))
         {
         }
 
-        // Constructor matching the original signature; keeps default initial position.
+        // Constructor matching the original signature; keeps default max energy and initial position.
         public PlayerStaticParams(int maxHp, float walkSpeed, float dashSpeed, float dashDuration, float dashCooldown, float dashDeceleration)
-            : this(maxHp, walkSpeed, dashSpeed, dashDuration, dashCooldown, dashDeceleration, new Vector2(1, 1))
+            : this(maxHp, 100, walkSpeed, dashSpeed, dashDuration, dashCooldown, dashDeceleration, new Vector2(1, 1))
+        {
+        }
+
+        // Constructor with max energy; keeps default initial position.
+        public PlayerStaticParams(int maxHp, int maxEnergy, float walkSpeed, float dashSpeed, float dashDuration, float dashCooldown, float dashDeceleration)
+            : this(maxHp, maxEnergy, walkSpeed, dashSpeed, dashDuration, dashCooldown, dashDeceleration, new Vector2(1, 1))
         {
         }
 
         // Primary constructor that allows specifying all values explicitly.
-        public PlayerStaticParams(int maxHp, float walkSpeed, float dashSpeed, float dashDuration, float dashCooldown, float dashDeceleration, Vector2 initialPosition)
+        public PlayerStaticParams(int maxHp, int maxEnergy, float walkSpeed, float dashSpeed, float dashDuration, float dashCooldown, float dashDeceleration, Vector2 initialPosition)
         {
             _maxHp = maxHp;
+            _maxEnergy = maxEnergy;
             _walkSpeed = walkSpeed;
             _dashSpeed = dashSpeed;
             _dashDuration = dashDuration;
